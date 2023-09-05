@@ -1,3 +1,12 @@
+# ET Stuff
+.idea
+.vscode
+cmake-*
+.DS_Store
+build
+generated
+CMakeUserPresets.json
+
 # Prerequisites
 *.d
 
