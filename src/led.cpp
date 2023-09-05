@@ -9,11 +9,13 @@
 #include "led.h"
 #include "ws2812.pio.h"
 
+#define LED_OFF PICO_DEFAULT_LED_PIN_INVERTED
+#define LED_ON  (1 - LED_OFF)
+
 static inline void put_pixel(uint32_t pixel_grb)
 {
     pio_sm_put_blocking(pio0, 0, pixel_grb << 8u);
 }
-
 
 void LED::blink_ms(uint duration, uint32_t color)
 {
@@ -22,11 +24,13 @@ void LED::blink_ms(uint duration, uint32_t color)
     off();
 }
 
+
 LED_pico::LED_pico(uint pin)
 {
     m_nPin = pin;
     gpio_init(m_nPin);
     gpio_set_dir(m_nPin, GPIO_OUT);
+    off();
 }
 
 LED_pico::~LED_pico()
@@ -37,12 +41,12 @@ LED_pico::~LED_pico()
 
 void LED_pico::on()
 {
-    gpio_put(m_nPin, 1);
+    gpio_put(m_nPin, LED_ON);
 }
 
 void LED_pico::off()
 {
-    gpio_put(m_nPin, 0);
+    gpio_put(m_nPin, LED_OFF);
 }
 
 
@@ -52,6 +56,7 @@ LED_neo::LED_neo(uint numLEDs, uint pin, uint powerPin, bool bIsRGBW)
       m_nNumLEDs(numLEDs),
       m_bIsRGBW(bIsRGBW)
 {
+    off();
 }
 
 LED_neo::~LED_neo()

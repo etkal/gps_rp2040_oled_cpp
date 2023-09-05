@@ -37,20 +37,20 @@
 
 #define SAT_ICON_RADIUS 2
 
-#define CHAR_WIDTH 8
-#define CHAR_HEIGHT 8
-#define LINE_HEIGHT (CHAR_HEIGHT+1)
-#define COL_WIDTH (CHAR_WIDTH)
-#define PAD_CHARS 0
+#define CHAR_WIDTH      8
+#define CHAR_HEIGHT     8
+#define LINE_HEIGHT     (CHAR_HEIGHT + 1)
+#define COL_WIDTH       (CHAR_WIDTH)
+#define PAD_CHARS       0
 
 static const double pi = 3.14159265359;
 
 
-GPS_OLED::GPS_OLED(SSD1306* pDisplay, GPS* pGPS, LED* pLED) :
-    m_pDisplay(pDisplay),
-    m_pGPS(pGPS),
-    m_pLED(pLED),
-    m_pGPSData(NULL)
+GPS_OLED::GPS_OLED(SSD1306* pDisplay, GPS* pGPS, LED* pLED)
+    : m_pDisplay(pDisplay),
+      m_pGPS(pGPS),
+      m_pLED(pLED),
+      m_pGPSData(NULL)
 {
 }
 
@@ -90,41 +90,43 @@ void GPS_OLED::gpsDataCB(void* pCtx, GPSData* pGPSData)
     delete pGPSData; // We must delete
 }
 
-
-
 void GPS_OLED::UpdateUI(GPSData* pGPSData)
 {
     m_pGPSData = pGPSData;
 
     // This code assumes OLED display 128x64 mono
-    uint16_t nWidth = m_pDisplay->width();
+    uint16_t nWidth  = m_pDisplay->width();
     uint16_t nHeight = m_pDisplay->height();
     m_pDisplay->fill(oled_black);
 
     // Draw satellite grid
-    drawSatGrid(0, 0, nWidth/2, nHeight, 2);
+    drawSatGrid(0, 0, nWidth / 2, nHeight, 2);
 
     // Draw upper right text
     drawText(3, pGPSData->strNumSats, oled_white, true, 0);
     drawText(4, pGPSData->strMode3D, oled_white, true, 0);
 
-    if (!pGPSData->strLatitude.empty())
+    if (m_pGPS->hasPosition())
     {
-        m_pLED->setPixel(0, led_green);
+        m_pLED->setPixel(0, m_pGPS->externalAntenna() ? led_blue : led_green);
         m_pLED->blink_ms(20);
-        drawText(0, pGPSData->strLatitude, oled_white, true, 0);
-        drawText(1, pGPSData->strLongitude, oled_white, true, 0);
-        drawText(2, pGPSData->strAltitude, oled_white, true, 0);
-        //drawText(5, pGPSData->strSpeedKts, oled_white, true, 0);
     }
+    else
+    {
+        m_pLED->setPixel(0, led_red);
+        m_pLED->blink_ms(20);
+    }
+
     if (!pGPSData->strGPSTime.empty())
     {
         drawText(-1, pGPSData->strGPSTime, oled_white, true, 0);
-        if (pGPSData->strLatitude.empty())
-        {
-            m_pLED->setPixel(0, led_red);
-            m_pLED->blink_ms(20);
-        }
+    }
+    if (!pGPSData->strLatitude.empty())
+    {
+        drawText(0, pGPSData->strLatitude, oled_white, true, 0);
+        drawText(1, pGPSData->strLongitude, oled_white, true, 0);
+        drawText(2, pGPSData->strAltitude, oled_white, true, 0);
+        // drawText(5, pGPSData->strSpeedKts, oled_white, true, 0);
     }
 
     // Draw clock
@@ -146,9 +148,9 @@ void GPS_OLED::UpdateUI(GPSData* pGPSData)
 
 void GPS_OLED::drawSatGrid(uint x, uint y, uint width, uint height, uint nRings)
 {
-    uint radius = min(width, height)/2 - CHAR_HEIGHT/2;
-    uint xCenter = x + width/2;
-    uint yCenter = y + height/2;
+    uint radius  = min(width, height) / 2 - CHAR_HEIGHT / 2;
+    uint xCenter = x + width / 2;
+    uint yCenter = y + height / 2;
     drawSatGridRadial(xCenter, yCenter, radius, nRings);
 }
 
@@ -156,16 +158,16 @@ void GPS_OLED::drawSatGridRadial(uint xCenter, uint yCenter, uint radius, uint n
 {
     for (uint i = 1; i <= nRings; ++i)
     {
-        m_pDisplay->ellipse(xCenter, yCenter, radius*i/nRings, radius*i/nRings, oled_white);
+        m_pDisplay->ellipse(xCenter, yCenter, radius * i / nRings, radius * i / nRings, oled_white);
     }
 
-    m_pDisplay->vline(xCenter, yCenter-radius-2, 2*radius+5, oled_white);
-    m_pDisplay->hline(xCenter-radius-2, yCenter, 2*radius+5, oled_white);
-    //m_pDisplay->text("^", xCenter-CHAR_WIDTH/2, yCenter-radius-CHAR_HEIGHT/2, oled_white);
-    m_pDisplay->text("'", xCenter-6, yCenter-radius-CHAR_HEIGHT/2, oled_white);
-    m_pDisplay->text("`", xCenter-2, yCenter-radius-CHAR_HEIGHT/2, oled_white);
+    m_pDisplay->vline(xCenter, yCenter - radius - 2, 2 * radius + 5, oled_white);
+    m_pDisplay->hline(xCenter - radius - 2, yCenter, 2 * radius + 5, oled_white);
+    // m_pDisplay->text("^", xCenter-CHAR_WIDTH/2, yCenter-radius-CHAR_HEIGHT/2, oled_white);
+    m_pDisplay->text("'", xCenter - 6, yCenter - radius - CHAR_HEIGHT / 2, oled_white);
+    m_pDisplay->text("`", xCenter - 2, yCenter - radius - CHAR_HEIGHT / 2, oled_white);
 
-    int satRadius = SAT_ICON_RADIUS/2;
+    int satRadius = SAT_ICON_RADIUS / 2;
     if (!m_pGPSData->strLatitude.empty())
     {
         satRadius = SAT_ICON_RADIUS;
@@ -183,19 +185,25 @@ void GPS_OLED::drawSatGridRadial(uint xCenter, uint yCenter, uint radius, uint n
                 break;
             }
         }
-   }
-
+    }
 }
 
-void GPS_OLED::drawCircleSat(uint gridCenterX, uint gridCenterY, uint nGridRadius, float elrad, float azrad, uint satRadius, uint16_t color, uint16_t fillColor)
+void GPS_OLED::drawCircleSat(uint gridCenterX,
+                             uint gridCenterY,
+                             uint nGridRadius,
+                             float elrad,
+                             float azrad,
+                             uint satRadius,
+                             uint16_t color,
+                             uint16_t fillColor)
 {
     // Draw satellite (fill first, then draw open circle)
     int dx = (nGridRadius - SAT_ICON_RADIUS) * cos(elrad) * sin(azrad);
     int dy = (nGridRadius - SAT_ICON_RADIUS) * cos(elrad) * -cos(azrad);
-    int x = gridCenterX + dx;
-    int y = gridCenterY + dy;
-    m_pDisplay->ellipse(x, y, satRadius, satRadius, fillColor, true);  // Clear area with fill
-    m_pDisplay->ellipse(x, y, satRadius, satRadius, color);  // Draw circle without fill
+    int x  = gridCenterX + dx;
+    int y  = gridCenterY + dy;
+    m_pDisplay->ellipse(x, y, satRadius, satRadius, fillColor, true); // Clear area with fill
+    m_pDisplay->ellipse(x, y, satRadius, satRadius, color);           // Draw circle without fill
 }
 
 void GPS_OLED::drawBarGraph(uint x, uint y, uint width, uint height)
@@ -295,6 +303,6 @@ void GPS_OLED::drawText(int nLine, string strText, uint16_t color, bool bRightAl
 {
     int x = (!bRightAlign) ? 0 : m_pDisplay->width() - (strText.length() * COL_WIDTH);
     int y = linePos(nLine);
-    x = x - nRightPad;
+    x     = x - nRightPad;
     m_pDisplay->text(strText.c_str(), x, y, color);
 }

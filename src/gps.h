@@ -22,12 +22,14 @@ class SatInfo
 public:
     SatInfo(uint num = 0, uint el = 0, uint az = 0, uint rssi = 0)
     {
-        m_num = num;
-        m_el = el;
-        m_az = az;
+        m_num  = num;
+        m_el   = el;
+        m_az   = az;
         m_rssi = rssi;
     }
-    ~SatInfo() {}
+    ~SatInfo()
+    {
+    }
 
     uint m_num;
     uint m_el;
@@ -41,8 +43,12 @@ typedef vector<uint> UsedList;
 class GPSData
 {
 public:
-    GPSData() {}
-    ~GPSData() {}
+    GPSData()
+    {
+    }
+    ~GPSData()
+    {
+    }
 
     string strLatitude;
     string strLongitude;
@@ -64,25 +70,39 @@ class GPS
 public:
     GPS(uart_inst_t* m_pUART, float GMToffset);
     ~GPS();
-    
+
     void setSentenceCallback(void* pCtx, sentenceCallback pCB);
     void setGpsDataCallback(void* pCtx, gpsDataCallback pCB);
-    
+
     void run();
-    uart_inst_t* getUART() { return m_pUART; }
+    uart_inst_t* getUART()
+    {
+        return m_pUART;
+    }
     void processSentence(string strSentence);
     bool validateSentence(string& strSentence);
     string checkSum(const string& strSentence);
     string convertToDegrees(string strRaw, int width);
-    
+    bool hasTime()
+    {
+        return m_bFixTime;
+    }
+    bool hasPosition()
+    {
+        return m_bFixPos;
+    }
+    bool externalAntenna()
+    {
+        return m_bExternalAntenna;
+    }
+
 private:
     uart_inst_t* m_pUART;
     float m_GMToffset;
-    int m_nWidth;
-    int m_nHeight;
-    
-    bool m_bFixPos;
+
     bool m_bFixTime;
+    bool m_bFixPos;
+    bool m_bExternalAntenna;
     bool m_bGSVInProgress;
     string m_strNumGSV;
     uint64_t m_nSatListTime;
