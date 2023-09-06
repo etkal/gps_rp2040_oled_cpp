@@ -106,17 +106,19 @@ void GPS_OLED::UpdateUI(GPSData* pGPSData)
     drawText(3, pGPSData->strNumSats, oled_white, true, 0);
     drawText(4, pGPSData->strMode3D, oled_white, true, 0);
 
-    if (m_pGPS->hasPosition())
+    if (m_pLED)
     {
-        m_pLED->setPixel(0, m_pGPS->externalAntenna() ? led_blue : led_green);
-        m_pLED->blink_ms(20);
+        if (m_pGPS->hasPosition())
+        {
+            m_pLED->setPixel(0, m_pGPS->externalAntenna() ? led_blue : led_green);
+            m_pLED->blink_ms(20);
+        }
+        else
+        {
+            m_pLED->setPixel(0, led_red);
+            m_pLED->blink_ms(20);
+        }
     }
-    else
-    {
-        m_pLED->setPixel(0, led_red);
-        m_pLED->blink_ms(20);
-    }
-
     if (!pGPSData->strGPSTime.empty())
     {
         drawText(-1, pGPSData->strGPSTime, oled_white, true, 0);

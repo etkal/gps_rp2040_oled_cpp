@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 #set(PICO_BOARD pico)
+#set(PICO_BOARD pico_w)
 #set(PICO_BOARD waveshare_rp2040_zero)
 set(PICO_BOARD seeed_xiao_rp2040)
 

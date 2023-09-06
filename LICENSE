@@ -51,8 +51,8 @@ THE SOFTWARE.
 
 =============================================================================
 
-The ws2812.pio code is from the Raspberry Pi pico-examples project and
-its use falls under the following copyright::
+ws2812.pio and some of the ssd1306 code is from the Raspberry Pi pico-examples
+project and its use falls under the following copyright:
 
 Copyright 2020 (c) 2020 Raspberry Pi (Trading) Ltd.
 

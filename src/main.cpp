@@ -21,6 +21,7 @@
  * THE SOFTWARE.
  */
 
+#include <memory>
 #include <stdio.h>
 #include <pico/stdlib.h>
 #include <hardware/gpio.h>
@@ -28,7 +29,7 @@
 
 #include "gps_oled.h"
 
-#define UART_ID        uart0
+#define UART_DEVICE    uart_default
 #define PIN_UART_TX    PICO_DEFAULT_UART_TX_PIN // Default is 0
 #define PIN_UART_RX    PICO_DEFAULT_UART_RX_PIN // Default is 1
 #define UART_BAUD_RATE 9600
@@ -36,58 +37,57 @@
 #define STOP_BITS      1
 #define PARITY         UART_PARITY_NONE
 
-#define I2C_PORT       i2c1
+#define I2C_DEVICE     i2c_default
 #define PIN_SDA        PICO_DEFAULT_I2C_SDA_PIN
 #define PIN_SCL        PICO_DEFAULT_I2C_SCL_PIN
 
-#define PIN_LED        PICO_DEFAULT_LED_PIN
-#define LED_OFF        PICO_DEFAULT_LED_PIN_INVERTED
-#define LED_ON         (1 - LED_OFF)
-#if defined(SEEED_XIAO_RP2040)
-#define XIAO_GREEN_LED_PIN 16
-#define XIAO_RED_LED_PIN   17
-#endif
+// #define USE_WS2812_PIN 12 // Override
+// #define USE_LED_PIN 16    // Override
 
 int main()
 {
     stdio_init_all();
 
     // Set up UART for GPS device
-    uart_init(UART_ID, UART_BAUD_RATE);
+    uart_init(UART_DEVICE, UART_BAUD_RATE);
     gpio_set_function(PIN_UART_TX, GPIO_FUNC_UART);
     gpio_set_function(PIN_UART_RX, GPIO_FUNC_UART);
-    uart_set_hw_flow(UART_ID, false, false);
-    uart_set_format(UART_ID, DATA_BITS, STOP_BITS, PARITY);
+    uart_set_hw_flow(UART_DEVICE, false, false);
+    uart_set_format(UART_DEVICE, DATA_BITS, STOP_BITS, PARITY);
 
     // Set up the OLED display
-    i2c_init(I2C_PORT, 400 * 1000);
+    i2c_init(I2C_DEVICE, 400 * 1000);
     gpio_set_function(PIN_SDA, GPIO_FUNC_I2C);
     gpio_set_function(PIN_SCL, GPIO_FUNC_I2C);
     gpio_pull_up(PIN_SDA);
     gpio_pull_up(PIN_SCL);
 
-    // Clear LED(s)
-    gpio_init(PICO_DEFAULT_LED_PIN);
-    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-    gpio_put(PICO_DEFAULT_LED_PIN, LED_OFF);
 #if defined(SEEED_XIAO_RP2040)
-    gpio_init(XIAO_GREEN_LED_PIN);
-    gpio_set_dir(XIAO_GREEN_LED_PIN, GPIO_OUT);
-    gpio_put(XIAO_GREEN_LED_PIN, LED_OFF);
-    gpio_init(XIAO_RED_LED_PIN);
-    gpio_set_dir(XIAO_RED_LED_PIN, GPIO_OUT);
-    gpio_put(XIAO_RED_LED_PIN, LED_OFF);
+    // Clear LED(s) on XIAO (default on)
+    LED_pico ledBlue(25);  // blue
+    LED_pico ledGreen(16); // green
+    LED_pico ledRed(17);   // red
 #endif
 
-#ifdef PICO_DEFAULT_WS2812_PIN
-    LED* pLED = new LED_neo(1);
+#if defined(USE_WS2812_PIN)
+    LED* pLED = new LED_neo(1, USE_WS2812_PIN);
     pLED->init();
     pLED->setPixel(0, led_green);
+#elif defined(PICO_DEFAULT_WS2812_PIN) && !defined(USE_LED_PIN)
+    LED* pLED = new LED_neo(1, PICO_DEFAULT_WS2812_PIN);
+    pLED->init();
+    pLED->setPixel(0, led_green);
+#elif defined(USE_LED_PIN)
+    LED* pLED = new LED_pico(USE_LED_PIN);
+    pLED->setIgnore({led_red});
+#elif defined(PICO_DEFAULT_LED_PIN)
+    LED* pLED = new LED_pico(PICO_DEFAULT_LED_PIN);
+    pLED->setIgnore({led_red});
 #else
-    LED* pLED = new LED_pico(PIN_LED);
+    LED* pLED = nullptr;
 #endif
-    GPS* pGPS             = new GPS(uart0, -5.0);
-    SSD1306_I2C* pDisplay = new SSD1306_I2C(128, 64, MVLSB, I2C_PORT);
+    GPS* pGPS             = new GPS(UART_DEVICE, -5.0);
+    SSD1306_I2C* pDisplay = new SSD1306_I2C(128, 64, MVLSB, I2C_DEVICE);
     GPS_OLED* pDevice     = new GPS_OLED(pDisplay, pGPS, pLED);
 
     pDevice->init();

@@ -43,10 +43,16 @@ private:
     void drawSatGridRadial(uint xCenter, uint yCenter, uint radius, uint nRings = 3);
     void drawBarGraph(uint x, uint y, uint width, uint height);
     void drawClock(uint x, uint y, uint radius, string strTime);
-    void drawCircleSat(uint gridCenterX, uint gridCenterY, uint nGridRadius,
-                       float elrad, float azrad, uint satRadius, uint16_t color=oled_white, uint16_t fillColor=oled_white);
-    int  linePos(int nLine);
-    void drawText(int nLine, string strText, uint16_t color=oled_white, bool bRightAlign=true, uint nRightPad=0);
+    void drawCircleSat(uint gridCenterX,
+                       uint gridCenterY,
+                       uint nGridRadius,
+                       float elrad,
+                       float azrad,
+                       uint satRadius,
+                       uint16_t color     = oled_white,
+                       uint16_t fillColor = oled_white);
+    int linePos(int nLine);
+    void drawText(int nLine, string strText, uint16_t color = oled_white, bool bRightAlign = true, uint nRightPad = 0);
 
     SSD1306* m_pDisplay;
     GPS* m_pGPS;
