@@ -7,12 +7,7 @@
 
 #pragma once
 
-#include <memory>
 #include <vector>
-#include <pico/stdlib.h>
-#include <hardware/gpio.h>
-#include <hardware/pio.h>
-#include <hardware/clocks.h>
 
 #if PICO_DEFAULT_LED_PIN_INVERTED
 auto constexpr LED_ON  = 0;

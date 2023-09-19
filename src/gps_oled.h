@@ -5,17 +5,11 @@
  *
  */
 
-#include <stdio.h>
-#include <string>
-#include "pico/stdlib.h"
-#include "hardware/gpio.h"
-#include "hardware/uart.h"
+#pragma once
 
 #include "ssd1306.h"
 #include "gps.h"
 #include "led.h"
-
-using std::string;
 
 // GPS_OLED class
 //

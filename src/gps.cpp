@@ -22,11 +22,7 @@
  * THE SOFTWARE.
  */
 
-#include <stdio.h>
-#include <iostream>
-#include <vector>
 #include <queue>
-#include <sstream>
 #include <iomanip>
 
 #include "gps.h"
@@ -73,7 +69,11 @@ GPS::GPS(uart_inst_t* pUART, float GMToffset)
       m_bFixPos(false),
       m_bExternalAntenna(true),
       m_bGSVInProgress(false),
-      m_pGPSData(NULL)
+      m_pGPSData(NULL),
+      m_pSentenceCallBack(nullptr),
+      m_pSentenceCtx(nullptr),
+      m_pGpsDataCallback(nullptr),
+      m_pGpsDataCtx(nullptr)
 {
 }
 
