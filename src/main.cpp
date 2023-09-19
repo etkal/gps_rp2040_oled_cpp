@@ -21,11 +21,6 @@
  * THE SOFTWARE.
  */
 
-#include <memory>
-#include <stdio.h>
-#include <pico/stdlib.h>
-#include <hardware/gpio.h>
-#include <hardware/uart.h>
 
 #include "gps_oled.h"
 

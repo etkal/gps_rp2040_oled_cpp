@@ -7,11 +7,8 @@
 
 #pragma once
 
-#include <stdio.h>
 #include <pico/stdlib.h>
-#include <hardware/gpio.h>
 #include <hardware/uart.h>
-#include <cstdint>
 #include <string>
 #include <vector>
 

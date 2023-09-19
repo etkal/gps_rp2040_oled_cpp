@@ -28,10 +28,8 @@
  * THE SOFTWARE.
  */
 
-#include <cstddef>
 #include <algorithm>
 #include "framebuf.h"
-#include <stdio.h>
 #include "font_petme128_8x8.h"
 
 using std::max;

@@ -9,9 +9,7 @@
 
 #pragma once
 
-#include <pico/stdlib.h>
 #include <hardware/i2c.h>
-#include <hardware/gpio.h>
 #include "framebuf.h"
 
 // Register definitions

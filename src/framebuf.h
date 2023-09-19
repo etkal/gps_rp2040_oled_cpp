@@ -6,7 +6,8 @@
  */
 
 #pragma once
-#include <cstdint>
+
+#include "pico/stdlib.h"
 
 typedef enum ePixelFormat
 {

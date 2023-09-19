@@ -22,17 +22,11 @@
  * THE SOFTWARE.
  */
 
-#include <stdio.h>
-#include "pico/stdlib.h"
-#include "hardware/gpio.h"
-#include "hardware/uart.h"
-
 #include "ssd1306.h"
 #include "framebuf.h"
 #include "gps.h"
 #include "led.h"
 #include "gps_oled.h"
-#include <pico/double.h>
 #include <math.h>
 
 #define SAT_ICON_RADIUS 2
@@ -44,7 +38,6 @@
 #define PAD_CHARS       0
 
 static const double pi = 3.14159265359;
-
 
 GPS_OLED::GPS_OLED(SSD1306* pDisplay, GPS* pGPS, LED* pLED)
     : m_pDisplay(pDisplay),

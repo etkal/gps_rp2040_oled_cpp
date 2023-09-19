@@ -24,35 +24,8 @@
  * THE SOFTWARE.
  */
 
-#include <stdio.h>
-#include <pico/stdlib.h>
-#include <hardware/gpio.h>
-#include <hardware/i2c.h>
 #include "ssd1306.h"
 
-
-void print_buf_page(uint8_t buf[], uint8_t page)
-{
-    // prints one page of a full length (128x4) buffer
-    for (int j = 0; j < OLED_PAGE_HEIGHT; j++)
-    {
-        for (int k = 0; k < OLED_WIDTH; k++)
-        {
-            printf("%u", (buf[page * OLED_WIDTH + k] >> j) & 0x01);
-        }
-        printf("\n");
-    }
-}
-
-void print_buf_pages(uint8_t buf[])
-{
-    // prints all pages of a full length buffer
-    for (int i = 0; i < OLED_NUM_PAGES; i++)
-    {
-        printf("--page %d--\n", i);
-        print_buf_page(buf, i);
-    }
-}
 
 SSD1306::SSD1306(uint nWidth, uint nHeight, ePixelFormat format, bool bExternalVcc)
     : Framebuf(nWidth, nHeight, format),
