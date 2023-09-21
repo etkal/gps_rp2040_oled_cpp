@@ -21,10 +21,13 @@
  * THE SOFTWARE.
  */
 
-
 #include "gps_oled.h"
 
-#define UART_DEVICE    uart_default
+#if defined(RASPBERRYPI_PICO_W)
+#include "pico/cyw43_arch.h"
+#endif
+
+#define UART_DEVICE    uart_default             // Default is uart0
 #define PIN_UART_TX    PICO_DEFAULT_UART_TX_PIN // Default is 0
 #define PIN_UART_RX    PICO_DEFAULT_UART_RX_PIN // Default is 1
 #define UART_BAUD_RATE 9600
@@ -64,6 +67,10 @@ int main()
     LED_pico ledRed(17);   // red
 #endif
 
+#if defined(RASPBERRYPI_PICO_W)
+    cyw43_arch_init();
+#endif
+
 #if defined(USE_WS2812_PIN)
     LED* pLED = new LED_neo(1, USE_WS2812_PIN);
     pLED->init();
@@ -78,10 +85,13 @@ int main()
 #elif defined(PICO_DEFAULT_LED_PIN)
     LED* pLED = new LED_pico(PICO_DEFAULT_LED_PIN);
     pLED->setIgnore({led_red});
+#elif defined(RASPBERRYPI_PICO_W)
+    LED* pLED = new LED_pico_w(CYW43_WL_GPIO_LED_PIN);
+    pLED->setIgnore({led_red});
 #else
     LED* pLED = nullptr;
 #endif
-    GPS* pGPS             = new GPS(UART_DEVICE, -5.0);
+    GPS* pGPS             = new GPS(UART_DEVICE);
     SSD1306_I2C* pDisplay = new SSD1306_I2C(128, 64, MVLSB, I2C_DEVICE);
     GPS_OLED* pDevice     = new GPS_OLED(pDisplay, pGPS, pLED);
 

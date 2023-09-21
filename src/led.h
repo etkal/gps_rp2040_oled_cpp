@@ -49,10 +49,10 @@ public:
     LED(){};
     virtual ~LED(){};
 
-    virtual void init() = 0;
-    virtual void on()   = 0;
-    virtual void off()  = 0;
-    virtual void setPixel(uint idx, uint32_t color);
+    virtual void init()                             = 0;
+    virtual void on()                               = 0;
+    virtual void off()                              = 0;
+    virtual void setPixel(uint idx, uint32_t color) = 0;
     virtual void setIgnore(std::vector<uint32_t> vIgnore){};
     void blink_ms(uint duration = 50, uint32_t color = led_white);
 };
@@ -63,13 +63,13 @@ public:
     LED_pico(uint pin);
     virtual ~LED_pico();
 
-    void init(){};
-    void on();
-    void off();
-    void setPixel(uint idx, uint32_t color);
-    void setIgnore(std::vector<uint32_t> vIgnore);
+    void init() override{};
+    void on() override;
+    void off() override;
+    void setPixel(uint idx, uint32_t color) override;
+    void setIgnore(std::vector<uint32_t> vIgnore) override;
 
-private:
+protected:
     uint m_nPin;
     uint32_t m_nColor;
     std::vector<uint32_t> m_vIgnore;
@@ -81,10 +81,10 @@ public:
     LED_neo(uint numLEDs, uint pin, uint powerPin = WS2812_POWER_PIN, bool bIsRGBW = false);
     virtual ~LED_neo();
 
-    void init();
-    void on();
-    void off();
-    void setPixel(uint idx, uint32_t color);
+    void init() override;
+    void on() override;
+    void off() override;
+    void setPixel(uint idx, uint32_t color) override;
 
 private:
     uint m_nPin;
@@ -93,3 +93,15 @@ private:
     bool m_bIsRGBW;
     std::vector<uint32_t> m_vPixels;
 };
+
+#if defined(RASPBERRYPI_PICO_W)
+class LED_pico_w : public LED_pico
+{
+public:
+    LED_pico_w(uint pin);
+    virtual ~LED_pico_w();
+
+    void on();
+    void off();
+};
+#endif

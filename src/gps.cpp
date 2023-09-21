@@ -62,9 +62,8 @@ static void on_uart_rx()
     }
 }
 
-GPS::GPS(uart_inst_t* pUART, float GMToffset)
+GPS::GPS(uart_inst_t* pUART)
     : m_pUART(pUART),
-      m_GMToffset(GMToffset),
       m_bFixTime(false),
       m_bFixPos(false),
       m_bExternalAntenna(true),
@@ -110,13 +109,8 @@ void GPS::run()
     // Now enable the UART to send interrupts - RX only
     uart_set_irq_enables(m_pUART, true, false);
 
-    // Write commands to enable reporting external vs internal antenna
-    sleep_ms(100);
-    uart_puts(m_pUART, "$PGCMD,33,1*6C\r\n"); // Enable antenna output for PA6H
-    sleep_ms(100);
-    uart_puts(m_pUART, "$CDCMD,33,1*7C\r\n"); // Enable antenna output for PA1616S
-
     string strSentence;
+    bool bSentAntennaCommands = false;
     while (true)
     {
         // Read sentence from GPS device
@@ -136,6 +130,14 @@ void GPS::run()
         {
             processSentence(strSentence);
             bSentenceAvailable = false;
+            if (!bSentAntennaCommands)
+            {
+                // Write commands to enable reporting external vs internal antenna.  We wait
+                // until some data is received to ensure the GPS has finished initializing.
+                uart_puts(m_pUART, "$PGCMD,33,1*6C\r\n"); // Enable antenna output for PA6H
+                uart_puts(m_pUART, "$CDCMD,33,1*7C\r\n"); // Enable antenna output for PA1616S
+                bSentAntennaCommands = true;
+            }
         }
     }
 }

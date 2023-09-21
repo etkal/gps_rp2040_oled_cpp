@@ -6,6 +6,9 @@
  */
 
 #include "pico/stdlib.h"
+#if defined(RASPBERRYPI_PICO_W)
+#include "pico/cyw43_arch.h"
+#endif
 #include "led.h"
 #include "ws2812.pio.h"
 
@@ -121,3 +124,33 @@ void LED_neo::setPixel(uint idx, uint32_t color)
 {
     m_vPixels[idx] = color;
 }
+
+#if defined(RASPBERRYPI_PICO_W)
+LED_pico_w::LED_pico_w(uint pin)
+    : LED_pico(pin)
+{
+    off();
+}
+
+LED_pico_w::~LED_pico_w()
+{
+    off();
+}
+
+void LED_pico_w::on()
+{
+    for (auto i : m_vIgnore)
+    {
+        if (i == m_nColor)
+        {
+            return;
+        }
+    }
+    cyw43_arch_gpio_put(m_nPin, 1);
+}
+
+void LED_pico_w::off()
+{
+    cyw43_arch_gpio_put(m_nPin, 0);
+}
+#endif

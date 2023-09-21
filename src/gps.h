@@ -61,11 +61,10 @@ public:
 typedef void (*sentenceCallback)(void* pCtx, string strSentence);
 typedef void (*gpsDataCallback)(void* pCtx, GPSData* pGPSData);
 
-
 class GPS
 {
 public:
-    GPS(uart_inst_t* m_pUART, float GMToffset);
+    GPS(uart_inst_t* m_pUART);
     ~GPS();
 
     void setSentenceCallback(void* pCtx, sentenceCallback pCB);
@@ -95,7 +94,6 @@ public:
 
 private:
     uart_inst_t* m_pUART;
-    float m_GMToffset;
 
     bool m_bFixTime;
     bool m_bFixPos;

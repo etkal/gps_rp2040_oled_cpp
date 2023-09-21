@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.24)
 
-#set(PICO_BOARD pico)
+# Set the board type for pin and LED decisions
+set(PICO_BOARD pico)
 #set(PICO_BOARD pico_w)
 #set(PICO_BOARD waveshare_rp2040_zero)
-set(PICO_BOARD seeed_xiao_rp2040)
+#set(PICO_BOARD seeed_xiao_rp2040)
 
 # initialize the SDK based on PICO_SDK_PATH
 # note: this must happen before project()
@@ -35,8 +36,11 @@ add_subdirectory(src)
 target_include_directories(gps_oled PUBLIC
     ${CMAKE_CURRENT_LIST_DIR})
 
-# Add pico_stdlib library which aggregates commonly used features
-target_link_libraries(gps_oled pico_stdlib pico_stdio hardware_gpio hardware_pio hardware_i2c)
+if (PICO_BOARD STREQUAL pico_w)
+  target_link_libraries(gps_oled pico_stdlib pico_stdio hardware_gpio hardware_pio hardware_i2c pico_cyw43_arch_none)
+else()
+  target_link_libraries(gps_oled pico_stdlib pico_stdio hardware_gpio hardware_pio hardware_i2c)
+endif()
 
 # create map/bin/hex/uf2 file in addition to ELF.
 pico_add_extra_outputs(gps_oled)
