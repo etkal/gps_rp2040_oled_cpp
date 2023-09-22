@@ -35,8 +35,6 @@ private:
     void UpdateUI(GPSData* pGPSData);
     void drawSatGrid(uint x, uint y, uint width, uint height, uint nRings = 3);
     void drawSatGridRadial(uint xCenter, uint yCenter, uint radius, uint nRings = 3);
-    void drawBarGraph(uint x, uint y, uint width, uint height);
-    void drawClock(uint x, uint y, uint radius, string strTime);
     void drawCircleSat(uint gridCenterX,
                        uint gridCenterY,
                        uint nGridRadius,

@@ -123,17 +123,6 @@ void GPS_OLED::UpdateUI(GPSData* pGPSData)
         drawText(2, pGPSData->strAltitude, oled_white, true, 0);
         // drawText(5, pGPSData->strSpeedKts, oled_white, true, 0);
     }
-
-    // Draw clock
-    // if (!pGPSData->strGPSTime.empty())
-    // {
-    //     drawClock(nWidth/2, LINE_HEIGHT*3, LINE_HEIGHT*7/2, pGPSData->strGPSTime);
-    // }
-
-    // Draw bar graph
-    // drawBarGraph(nWidth/2, nHeight/2,
-    //              nWidth/2 - (PAD_CHARS*CHAR_WIDTH), nHeight/2 - (PAD_CHARS*CHAR_HEIGHT));
-
     m_pGPSData = NULL;
 
     // blit the framebuf to the display
@@ -199,91 +188,6 @@ void GPS_OLED::drawCircleSat(uint gridCenterX,
     int y  = gridCenterY + dy;
     m_pDisplay->ellipse(x, y, satRadius, satRadius, fillColor, true); // Clear area with fill
     m_pDisplay->ellipse(x, y, satRadius, satRadius, color);           // Draw circle without fill
-}
-
-void GPS_OLED::drawBarGraph(uint x, uint y, uint width, uint height)
-{
-    // static const uint nMaxSats = 14;
-    // uint barDelta = width/nMaxSats;
-    // uint barWidth = barDelta-2;
-    // uint barPosX = x + width - (m_vSatList.size() * barDelta);
-    // uint barHeightMax = height - LINE_HEIGHT*2;
-
-    // for (auto pSat : m_vSatList)
-    // {
-    //     uint rssi = pSat->m_rssi;
-    //     uint barHeight = (int)((double)barHeightMax * (double)rssi/64);
-    //     uint baseLineY = y + barHeightMax;
-    //     m_pFBuf->hline(barPosX, baseLineY, barDelta, COLOUR_WHITE);
-    //     uint nSat = pSat->m_num;
-    //     std::stringstream oss;
-    //     oss << fixed << setw(2) << setfill('0') << setprecision(0) << nSat;
-    //     string strSatNum = oss.str();
-    //     uint charPosX = barPosX + (barDelta - CHAR_WIDTH)/2;
-    //     m_pFBuf->text(strSatNum.substr(0,1).c_str(), charPosX, baseLineY+2, COLOUR_WHITE);
-    //     m_pFBuf->text(strSatNum.substr(1,1).c_str(), charPosX, baseLineY+CHAR_HEIGHT+2, COLOUR_WHITE);
-    //     if (barHeight > 0)
-    //     {
-    //         m_pFBuf->rect(barPosX+1, baseLineY-barHeight+1, barWidth, barHeight, COLOUR_WHITE);
-    //     }
-    //     for (auto pUsedSat : m_vUsedSatList)
-    //     {
-    //         if (pSat->m_num == pUsedSat->m_num)
-    //         {
-    //             if (barHeight > 0)
-    //             {
-    //                 m_pFBuf->rect(barPosX+2, baseLineY-barHeight+2, barWidth-2, barHeight-2, COLOUR_BLUE, true);
-    //             }
-    //             break;
-    //         }
-    //     }
-    //     barPosX += barDelta;
-    // }
-}
-
-void GPS_OLED::drawClock(uint x, uint y, uint radius, string strTime)
-{
-    // uint xCenter = x + radius;
-    // uint yCenter = y + radius;
-    // uint nHour = atoi(strTime.substr(0,2).c_str());
-    // float hour = (float)(nHour % 12) + m_GMToffset;
-    // hour = (hour < 0) ? hour + 12 : hour;
-    // hour = (hour >= 12) ? hour - 12 : hour;
-    // float minute = (float)atoi(strTime.substr(3,2).c_str());
-    // float second = (float)atoi(strTime.substr(6,2).c_str());
-    // uint16_t faceColor = COLOUR_BLACK;
-    // uint16_t handColor = COLOUR_WHITE;
-    // uint16_t secondHandColor = COLOUR_RED;
-    // double handLenHour = radius * 0.4;
-    // double handLenMinute = radius * 0.7;
-    // double handLenSecond = radius * 0.8;
-    // double radiansHour = 2 * pi * (((hour * 3600.0) + (minute * 60.0) + second) / (12.0 * 60.0 * 60.0));
-    // double radiansMinute = 2 * pi * (((minute * 60.0) + second) / (60.0 * 60.0));
-    // double radiansSecond = 2 * pi * (second / 60.0);
-    // int dxh = int(handLenHour * sin(radiansHour));
-    // int dyh = int(handLenHour * -cos(radiansHour));
-    // int dxm = int(handLenMinute * sin(radiansMinute));
-    // int dym = int(handLenMinute * -cos(radiansMinute));
-    // int dxs = int(handLenSecond * sin(radiansSecond));
-    // int dys = int(handLenSecond * -cos(radiansSecond));
-
-    // // Draw the face
-    // m_pFBuf->ellipse(xCenter, yCenter, radius-1, radius-1, COLOUR_GREEN, true);
-    // m_pFBuf->ellipse(xCenter, yCenter, radius-2, radius-2, faceColor, true);
-    // // Draw quarter dots
-    // for (uint degDot = 0; degDot<360; degDot += 30)
-    // {
-    //     uint dxDot = int((radius-3) * sin(degDot * pi / 180));
-    //     uint dyDot = int((radius-3) * -cos(degDot * pi / 180));
-    //     uint16_t colDot = (degDot%90 == 0) ? COLOUR_BLUE : COLOUR_GRAY;
-    //     uint16_t sizDot = (degDot%90 == 0) ? 2 : 1;
-    //     m_pFBuf->ellipse(xCenter+dxDot, yCenter+dyDot, sizDot, sizDot, colDot, true);
-    // }
-    // // Draw the hands
-    // m_pFBuf->line(xCenter, yCenter, xCenter+dxs, yCenter+dys, secondHandColor);
-    // m_pFBuf->line(xCenter, yCenter, xCenter+dxh, yCenter+dyh, handColor);
-    // m_pFBuf->line(xCenter, yCenter, xCenter+dxm, yCenter+dym, handColor);
-    // m_pFBuf->ellipse(xCenter, yCenter, 1, 1, faceColor);
 }
 
 int GPS_OLED::linePos(int nLine)
