@@ -27,17 +27,22 @@
 #include "ssd1306.h"
 
 
-SSD1306::SSD1306(uint nWidth, uint nHeight, ePixelFormat format, bool bExternalVcc)
-    : Framebuf(nWidth, nHeight, format),
-      m_nWidth(nWidth),
-      m_nHeight(nHeight),
+SSD1306::SSD1306(uint nWidth, uint nHeight, bool bExternalVcc)
+    : m_dispWidth(nWidth),
+      m_dispHeight(nHeight),
       m_bExternalVcc(bExternalVcc),
       m_nPages(nHeight / 8)
 {
 }
 
-void SSD1306::init()
+void SSD1306::Reset()
 {
+}
+
+void SSD1306::Initialize()
+{
+    Framebuf::Initialize(m_dispWidth, m_dispHeight, MVLSB);
+
     initInternal();
 
     write_cmd(OLED_SET_DISP); // display off
@@ -53,7 +58,7 @@ void SSD1306::init()
     // column address 127 is mapped to SEG0
 
     write_cmd(OLED_SET_MUX_RATIO); // set multiplex ratio
-    write_cmd(m_nHeight - 1);      // display height
+    write_cmd(m_dispHeight - 1);   // display height
 
     write_cmd(OLED_SET_COM_OUT_DIR | 0x08); // set COM (common) output scan direction
     // scan from bottom up, COM[N-1] to COM0
@@ -61,9 +66,9 @@ void SSD1306::init()
     write_cmd(OLED_SET_DISP_OFFSET); // set display offset
     write_cmd(0x00);                 // no offset
 
-    write_cmd(OLED_SET_COM_PIN_CFG);                     // set COM (common) pins hardware configuration
-    write_cmd((m_nWidth > 2 * m_nHeight) ? 0x02 : 0x12); // manufacturer magic number
-                                                         // 0x02 if self.width > 2 * self.height else 0x12,
+    write_cmd(OLED_SET_COM_PIN_CFG);                           // set COM (common) pins hardware configuration
+    write_cmd((m_dispWidth > 2 * m_dispHeight) ? 0x02 : 0x12); // manufacturer magic number
+                                                               // 0x02 if self.width > 2 * self.height else 0x12,
 
     /* timing and driving scheme */
     write_cmd(OLED_SET_DISP_CLK_DIV); // set display clock divide ratio
@@ -92,41 +97,41 @@ void SSD1306::init()
     write_cmd(OLED_SET_DISP | 0x01); // turn display on
 }
 
-void SSD1306::powerOff()
+void SSD1306::DisplayOff()
 {
     write_cmd(OLED_SET_DISP); // display off
 }
 
-void SSD1306::powerOn()
+void SSD1306::DisplayOn()
 {
     write_cmd(OLED_SET_DISP | 0x01); // turn display on
 }
 
-void SSD1306::contrast(uint8_t contrast)
+void SSD1306::SetContrast(uint8_t contrast)
 {
     write_cmd(OLED_SET_CONTRAST); // set contrast control
     write_cmd(contrast);
 }
 
-void SSD1306::invert(bool bInvert)
+void SSD1306::Invert(bool bInvert)
 {
     write_cmd(OLED_SET_NORM_INV | bInvert ? 0x01 : 0x00);
 }
 
-void SSD1306::rotate(bool bRotate)
+void SSD1306::Rotate(bool bRotate)
 {
     write_cmd(OLED_SET_COM_OUT_DIR | (bRotate ? 0x08 : 0x00)); // set COM (common) output scan direction
     write_cmd(OLED_SET_SEG_REMAP | (bRotate ? 0x01 : 0x00));   // set segment re-map
 }
 
-void SSD1306::show()
+void SSD1306::Show()
 {
     uint8_t x0 = 0;
-    uint8_t x1 = m_nWidth - 1;
-    if (m_nWidth != 128)
+    uint8_t x1 = m_dispWidth - 1;
+    if (m_dispWidth != 128)
     {
         // narrow displays use centred columns
-        uint col_offset = (128 - m_nWidth) / 2;
+        uint col_offset = (128 - m_dispWidth) / 2;
         x0 += col_offset;
         x1 += col_offset;
     }
@@ -140,19 +145,64 @@ void SSD1306::show()
     write_data(reinterpret_cast<uint8_t*>(buffer()), buflen);
 }
 
+void SSD1306::SetPixel(int x, int y, uint16_t color)
+{
+    return Framebuf::setpixel(x, y, color);
+}
+
+uint16_t SSD1306::GetPixel(int x, int y)
+{
+    return Framebuf::getpixel(x, y);
+}
+
+void SSD1306::FillRect(int x, int y, int w, int h, uint16_t color)
+{
+    return Framebuf::fillrect(x, y, w, h, color);
+}
+
+void SSD1306::Fill(uint16_t color)
+{
+    return Framebuf::fill(color);
+}
+
+void SSD1306::HLine(int x, int y, int w, uint16_t color)
+{
+    return Framebuf::hline(x, y, w, color);
+}
+
+void SSD1306::VLine(int x, int y, int h, uint16_t color)
+{
+    return Framebuf::vline(x, y, h, color);
+}
+
+void SSD1306::Rect(int x, int y, int w, int h, uint16_t color, bool bFill)
+{
+    return Framebuf::rect(x, y, w, h, color, bFill);
+}
+
+void SSD1306::Line(int x1, int y1, int x2, int y2, uint16_t color)
+{
+    return Framebuf::line(x1, y1, x2, y2, color);
+}
+
+void SSD1306::Ellipse(int cx, int cy, int xradius, int yradius, uint16_t color, bool bFill, uint8_t mask)
+{
+    return Framebuf::ellipse(cx, cy, xradius, yradius, color, bFill, mask);
+}
+
+void SSD1306::Text(const char* str, int x, int y, uint16_t color)
+{
+    return Framebuf::text(str, x, y, color);
+}
 
 //
 // SSD1306_I2C
 //
 
-SSD1306_I2C::SSD1306_I2C(uint nWidth, uint nHeight, ePixelFormat format, i2c_inst_t* i2c, uint8_t addr, bool bExternalVcc)
-    : SSD1306(nWidth, nHeight, format, bExternalVcc),
+SSD1306_I2C::SSD1306_I2C(uint nWidth, uint nHeight, i2c_inst_t* i2c, uint8_t addr, bool bExternalVcc)
+    : SSD1306(nWidth, nHeight, bExternalVcc),
       m_i2c(i2c),
       m_addr(addr)
-{
-}
-
-SSD1306_I2C::~SSD1306_I2C()
 {
 }
 

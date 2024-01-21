@@ -21,11 +21,15 @@
  * THE SOFTWARE.
  */
 
-#include "gps_oled.h"
+#include <iostream>
+#include <pico/stdlib.h>
+#include "hardware/adc.h"
 
 #if defined(RASPBERRYPI_PICO_W)
 #include "pico/cyw43_arch.h"
 #endif
+
+#include "gps_oled.h"
 
 #define UART_DEVICE    uart_default             // Default is uart0
 #define PIN_UART_TX    PICO_DEFAULT_UART_TX_PIN // Default is 0
@@ -42,9 +46,14 @@
 // #define USE_WS2812_PIN 12 // Override
 // #define USE_LED_PIN 16    // Override
 
+#if !defined(GPSD_GMT_OFFSET)
+#define GPSD_GMT_OFFSET 0.0
+#endif
+
 int main()
 {
     stdio_init_all();
+    adc_init();
 
     // Set up UART for GPS device
     uart_init(UART_DEVICE, UART_BAUD_RATE);
@@ -71,32 +80,43 @@ int main()
     cyw43_arch_init();
 #endif
 
+    // Create the LED object
+    LED::Shared spLED;
 #if defined(USE_WS2812_PIN)
-    LED* pLED = new LED_neo(1, USE_WS2812_PIN);
-    pLED->init();
-    pLED->setPixel(0, led_green);
+    spLED = std::make_shared<LED_neo>(1, USE_WS2812_PIN);
+    spLED->Initialize();
+    spLED->SetPixel(0, led_green);
 #elif defined(PICO_DEFAULT_WS2812_PIN) && !defined(USE_LED_PIN)
-    LED* pLED = new LED_neo(1, PICO_DEFAULT_WS2812_PIN);
-    pLED->init();
-    pLED->setPixel(0, led_green);
+    spLED = std::make_shared<LED_neo>(1, PICO_DEFAULT_WS2812_PIN);
+    spLED->Initialize();
+    spLED->SetPixel(0, led_green);
 #elif defined(USE_LED_PIN)
-    LED* pLED = new LED_pico(USE_LED_PIN);
-    pLED->setIgnore({led_red});
+    spLED = std::make_shared<LED_pico>(USE_LED_PIN);
+    spLED->SetIgnore({led_red});
 #elif defined(PICO_DEFAULT_LED_PIN)
-    LED* pLED = new LED_pico(PICO_DEFAULT_LED_PIN);
-    pLED->setIgnore({led_red});
+    spLED = std::make_shared<LED_pico>(PICO_DEFAULT_LED_PIN);
+    spLED->SetIgnore({led_red});
 #elif defined(RASPBERRYPI_PICO_W)
-    LED* pLED = new LED_pico_w(CYW43_WL_GPIO_LED_PIN);
-    pLED->setIgnore({led_red});
-#else
-    LED* pLED = nullptr;
+    spLED = std::make_shared<LED_pico_w>(CYW43_WL_GPIO_LED_PIN);
+    spLED->SetIgnore({led_red});
 #endif
-    GPS* pGPS             = new GPS(UART_DEVICE);
-    SSD1306_I2C* pDisplay = new SSD1306_I2C(128, 64, MVLSB, I2C_DEVICE);
-    GPS_OLED* pDevice     = new GPS_OLED(pDisplay, pGPS, pLED);
 
-    pDevice->init();
-    pDevice->run();
+    // Create the GPS object
+    GPS::Shared spGPS = std::make_shared<GPS>(UART_DEVICE);
+
+    // Create the display
+    SSD1306::Shared spDisplay = std::make_shared<SSD1306_I2C>(128, 64, I2C_DEVICE);
+
+    // Create the GPS_TFT display object
+    GPS_OLED::Shared spDevice = std::make_shared<GPS_OLED>(spDisplay, spGPS, spLED, GPSD_GMT_OFFSET);
+
+    spDevice->Initialize();
+    // Run the show
+    spDevice->Run();
+
+#if defined(RASPBERRYPI_PICO_W)
+    cyw43_arch_deinit();
+#endif
 
     return 0;
 }

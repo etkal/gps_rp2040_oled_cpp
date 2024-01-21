@@ -1,7 +1,7 @@
 /*
  * Pico LED class
  *
- * (c) 2023 Erik Tkal
+ * (c) 2024 Erik Tkal
  *
  */
 
@@ -17,11 +17,11 @@ static inline void put_pixel(uint32_t pixel_grb)
     pio_sm_put_blocking(pio0, 0, pixel_grb << 8u);
 }
 
-void LED::blink_ms(uint duration, uint32_t color)
+void LED::Blink_ms(uint duration, uint32_t color)
 {
-    on();
+    On();
     sleep_ms(duration);
-    off();
+    Off();
 }
 
 
@@ -31,16 +31,16 @@ LED_pico::LED_pico(uint pin)
 {
     gpio_init(m_nPin);
     gpio_set_dir(m_nPin, GPIO_OUT);
-    off();
+    Off();
 }
 
 LED_pico::~LED_pico()
 {
-    off();
+    Off();
     gpio_deinit(m_nPin);
 }
 
-void LED_pico::on()
+void LED_pico::On()
 {
     for (auto i : m_vIgnore)
     {
@@ -52,17 +52,17 @@ void LED_pico::on()
     gpio_put(m_nPin, LED_ON);
 }
 
-void LED_pico::off()
+void LED_pico::Off()
 {
     gpio_put(m_nPin, LED_OFF);
 }
 
-void LED_pico::setPixel(uint idx, uint32_t color)
+void LED_pico::SetPixel(uint idx, uint32_t color)
 {
     m_nColor = color;
 }
 
-void LED_pico::setIgnore(std::vector<uint32_t> vIgnore)
+void LED_pico::SetIgnore(std::vector<uint32_t> vIgnore)
 {
     m_vIgnore = vIgnore;
 }
@@ -74,12 +74,12 @@ LED_neo::LED_neo(uint numLEDs, uint pin, uint powerPin, bool bIsRGBW)
       m_nNumLEDs(numLEDs),
       m_bIsRGBW(bIsRGBW)
 {
-    off();
+    Off();
 }
 
 LED_neo::~LED_neo()
 {
-    off();
+    Off();
     if (0 != m_nPowerPin)
     {
         gpio_put(m_nPowerPin, 0);
@@ -87,7 +87,7 @@ LED_neo::~LED_neo()
     }
 }
 
-void LED_neo::init()
+void LED_neo::Initialize()
 {
     PIO pio     = pio0;
     int sm      = 0;
@@ -104,7 +104,7 @@ void LED_neo::init()
     m_vPixels.resize(m_nNumLEDs);
 }
 
-void LED_neo::on()
+void LED_neo::On()
 {
     for (size_t i = 0; i < m_nNumLEDs; ++i)
     {
@@ -112,7 +112,7 @@ void LED_neo::on()
     }
 }
 
-void LED_neo::off()
+void LED_neo::Off()
 {
     for (size_t i = 0; i < m_nNumLEDs; ++i)
     {
@@ -120,7 +120,7 @@ void LED_neo::off()
     }
 }
 
-void LED_neo::setPixel(uint idx, uint32_t color)
+void LED_neo::SetPixel(uint idx, uint32_t color)
 {
     m_vPixels[idx] = color;
 }
@@ -129,15 +129,15 @@ void LED_neo::setPixel(uint idx, uint32_t color)
 LED_pico_w::LED_pico_w(uint pin)
     : LED_pico(pin)
 {
-    off();
+    Off();
 }
 
 LED_pico_w::~LED_pico_w()
 {
-    off();
+    Off();
 }
 
-void LED_pico_w::on()
+void LED_pico_w::On()
 {
     for (auto i : m_vIgnore)
     {
@@ -149,7 +149,7 @@ void LED_pico_w::on()
     cyw43_arch_gpio_put(m_nPin, 1);
 }
 
-void LED_pico_w::off()
+void LED_pico_w::Off()
 {
     cyw43_arch_gpio_put(m_nPin, 0);
 }

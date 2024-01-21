@@ -1,7 +1,7 @@
 /*
  * Framebuffer implementation, rewritten from MicroPython modframebuf.c
  *
- * This version (c) 2023 Erik Tkal
+ * This version (c) 2024 Erik Tkal
  *
  * Original copyright:
  *
@@ -29,6 +29,8 @@
  */
 
 #include <algorithm>
+#include <iostream>
+
 #include "framebuf.h"
 #include "font_petme128_8x8.h"
 
@@ -36,7 +38,38 @@ using std::max;
 using std::min;
 using std::size_t;
 
-Framebuf::Framebuf(uint16_t nWidth, uint16_t nHeight, ePixelFormat eFormat, bool bRevBytes, uint16_t nStride)
+Framebuf::Framebuf()
+    : m_pBuf(nullptr),
+      m_nWidth(0),
+      m_nHeight(0),
+      m_nStride(0),
+      m_eFormat(RGB565),
+      m_bRevBytes(false)
+{
+}
+
+Framebuf::~Framebuf()
+{
+    if (nullptr == m_pBuf)
+    {
+        return;
+    }
+    switch (m_eFormat)
+    {
+    case MVLSB:
+    case MHLSB:
+    case MHMSB:
+        delete[] (uint8_t*)m_pBuf;
+        break;
+    case RGB565:
+        delete[] (uint16_t*)m_pBuf;
+        break;
+    default:
+        break;
+    }
+}
+
+void Framebuf::Initialize(uint16_t nWidth, uint16_t nHeight, ePixelFormat eFormat, bool bRevBytes, uint16_t nStride)
 {
     m_nWidth    = nWidth;
     m_nHeight   = nHeight;
@@ -58,34 +91,18 @@ Framebuf::Framebuf(uint16_t nWidth, uint16_t nHeight, ePixelFormat eFormat, bool
         m_pBuf = new uint16_t[m_nWidth * m_nHeight];
         break;
     default:
-        m_pBuf = NULL;
-        break;
-    }
-}
-
-Framebuf::~Framebuf()
-{
-    switch (m_eFormat)
-    {
-    case MVLSB:
-    case MHLSB:
-    case MHMSB:
-        delete[] (uint8_t*)m_pBuf;
-        break;
-    case RGB565:
-        delete[] (uint16_t*)m_pBuf;
-        break;
-    default:
+        m_pBuf = nullptr;
         break;
     }
 }
 
 void Framebuf::setpixel(int x, int y, uint16_t color)
 {
-    if (x < 0 || x >= m_nWidth || y < 0 || y >= m_nHeight)
+    if (!check(x, y) || nullptr == m_pBuf)
     {
         return;
     }
+
     switch (m_eFormat)
     {
     case MVLSB:
@@ -106,17 +123,9 @@ void Framebuf::setpixel(int x, int y, uint16_t color)
     }
 }
 
-void Framebuf::setpixel_checked(int x, int y, uint16_t color, uint8_t mask)
-{
-    if (mask && 0 <= x && x < m_nWidth && 0 <= y && y < m_nHeight)
-    {
-        setpixel(x, y, color);
-    }
-}
-
 uint16_t Framebuf::getpixel(int x, int y)
 {
-    if (0 > x || x >= m_nWidth || 0 > y || y >= m_nHeight)
+    if (!check(x, y) || nullptr == m_pBuf)
     {
         return 0;
     }
@@ -136,23 +145,10 @@ uint16_t Framebuf::getpixel(int x, int y)
 
 void Framebuf::fillrect(int x, int y, int w, int h, uint16_t color)
 {
-    if (h < 1 || w < 1 || x + w <= 0 || y + h <= 0 || y >= m_nHeight || x >= m_nWidth)
+    if (!check(x, y, w, h) || nullptr == m_pBuf)
     {
-        // No operation needed.
         return;
     }
-
-    // clip to the framebuffer
-    int xend = min((int)m_nWidth, x + w);
-    int yend = min((int)m_nHeight, y + h);
-    x        = max(x, 0);
-    y        = max(y, 0);
-
-    fillrect_checked(x, y, xend - x, yend - y, color);
-}
-
-void Framebuf::fillrect_checked(int x, int y, int w, int h, uint16_t color)
-{
     switch (m_eFormat)
     {
     case MVLSB:
@@ -186,12 +182,10 @@ void Framebuf::fillrect_checked(int x, int y, int w, int h, uint16_t color)
     }
 }
 
-
 void Framebuf::fill(uint16_t color)
 {
     fillrect(0, 0, m_nWidth, m_nHeight, color);
 }
-
 
 void Framebuf::hline(int x, int y, int w, uint16_t color)
 {
@@ -202,7 +196,6 @@ void Framebuf::vline(int x, int y, int h, uint16_t color)
 {
     fillrect(x, y, 1, h, color);
 }
-
 
 void Framebuf::rect(int x, int y, int w, int h, uint16_t color, bool bFill)
 {
@@ -350,6 +343,63 @@ void Framebuf::ellipse(int cx, int cy, int xradius, int yradius, uint16_t color,
     return;
 }
 
+void Framebuf::text(const char* str, int x, int y, uint16_t color)
+{
+    // loop over chars
+    for (; *str; ++str)
+    {
+        // get char and make sure its in range of font
+        int chr = *(uint8_t*)str;
+        if (chr < 32 || chr > 127)
+        {
+            chr = 127;
+        }
+        // get char data
+        const uint8_t* chr_data = &font_petme128_8x8[(chr - 32) * 8];
+        // loop over char data
+        for (int j = 0; j < 8; j++, x++)
+        {
+            if (0 <= x && x < m_nWidth)
+            {                                                        // clip x
+                uint vline_data = chr_data[j];                       // each byte is a column of 8 pixels, LSB at top
+                for (int y1 = y; vline_data; vline_data >>= 1, y1++) // scan over vertical column
+                {
+                    if (vline_data & 1) // only draw if pixel set
+                    {
+                        if (0 <= y1 && y1 < m_nHeight) // clip y
+                        {
+                            setpixel(x, y1, color);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Private methods
+
+bool Framebuf::check(int& x, int& y)
+{
+    return (0 <= x && x < m_nWidth && 0 <= y && y < m_nHeight);
+}
+
+bool Framebuf::check(int& x, int& y, int& w, int& h)
+{
+    if (w < 1 || h < 1 || x + w <= 0 || y + h <= 0 || x >= m_nWidth || y >= m_nHeight)
+    {
+        return false;
+    }
+    // clip to the framebuffer size
+    int xend = min((int)m_nWidth, x + w);
+    int yend = min((int)m_nHeight, y + h);
+    x        = max(x, 0);
+    y        = max(y, 0);
+    w        = xend - x;
+    h        = yend - y;
+    return true;
+}
+
 void Framebuf::ellipse_points(int cx, int cy, int x, int y, uint16_t color, uint8_t mask)
 {
     if (mask & ELLIPSE_MASK_FILL)
@@ -373,10 +423,18 @@ void Framebuf::ellipse_points(int cx, int cy, int x, int y, uint16_t color, uint
     }
     else
     {
-        setpixel_checked(cx + x, cy - y, color, mask & ELLIPSE_MASK_Q1);
-        setpixel_checked(cx - x, cy - y, color, mask & ELLIPSE_MASK_Q2);
-        setpixel_checked(cx - x, cy + y, color, mask & ELLIPSE_MASK_Q3);
-        setpixel_checked(cx + x, cy + y, color, mask & ELLIPSE_MASK_Q4);
+        setpixel_masked(cx + x, cy - y, color, mask & ELLIPSE_MASK_Q1);
+        setpixel_masked(cx - x, cy - y, color, mask & ELLIPSE_MASK_Q2);
+        setpixel_masked(cx - x, cy + y, color, mask & ELLIPSE_MASK_Q3);
+        setpixel_masked(cx + x, cy + y, color, mask & ELLIPSE_MASK_Q4);
+    }
+}
+
+void Framebuf::setpixel_masked(int x, int y, uint16_t color, uint8_t mask)
+{
+    if (0 != mask && check(x, y))
+    {
+        setpixel(x, y, color);
     }
 }
 
@@ -428,40 +486,6 @@ void Framebuf::scroll(int xstep, int ystep)
         for (int x = sx; x != xend; x += dx)
         {
             setpixel(x, y, getpixel(x - xstep, y - ystep));
-        }
-    }
-}
-
-void Framebuf::text(const char* str, int x, int y, uint16_t color)
-{
-    // loop over chars
-    for (; *str; ++str)
-    {
-        // get char and make sure its in range of font
-        int chr = *(uint8_t*)str;
-        if (chr < 32 || chr > 127)
-        {
-            chr = 127;
-        }
-        // get char data
-        const uint8_t* chr_data = &font_petme128_8x8[(chr - 32) * 8];
-        // loop over char data
-        for (int j = 0; j < 8; j++, x++)
-        {
-            if (0 <= x && x < m_nWidth)
-            {                                  // clip x
-                uint vline_data = chr_data[j]; // each byte is a column of 8 pixels, LSB at top
-                for (int y1 = y; vline_data; vline_data >>= 1, y1++)
-                { // scan over vertical column
-                    if (vline_data & 1)
-                    { // only draw if pixel set
-                        if (0 <= y1 && y1 < m_nHeight)
-                        { // clip y
-                            setpixel(x, y1, color);
-                        }
-                    }
-                }
-            }
         }
     }
 }

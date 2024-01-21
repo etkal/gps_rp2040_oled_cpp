@@ -1,7 +1,7 @@
 /*
  * GPS class
  *
- * Copyright (c) 2023 Erik Tkal
+ * Copyright (c) 2024 Erik Tkal
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,33 +23,33 @@
  */
 
 #include <queue>
+#include <iostream>
 #include <iomanip>
 
 #include "gps.h"
 #include <pico/sync.h>
 
-using namespace std;
 
 static GPS* sg_pGPS = NULL;
 static char szSentence[256];
 static uint nRead = 0;
 static critical_section_t critsec;
 
-static queue<string> sg_sentenceQueue;
+static std::queue<std::string> sg_sentenceQueue;
 
 // RX interrupt handler
 static void on_uart_rx()
 {
-    uart_inst_t* pUART = sg_pGPS->getUART();
+    uart_inst_t* pUART = sg_pGPS->GetUART();
     while (uart_is_readable(pUART))
     {
         char ch             = uart_getc(pUART);
         szSentence[nRead++] = ch;
         if (ch == '\n')
         {
-            szSentence[nRead++] = '\0';
-            string sentence     = szSentence;
-            nRead               = 0;
+            szSentence[nRead++]  = '\0';
+            std::string sentence = szSentence;
+            nRead                = 0;
             critical_section_enter_blocking(&critsec);
             sg_sentenceQueue.push(sentence);
             critical_section_exit(&critsec);
@@ -64,11 +64,11 @@ static void on_uart_rx()
 
 GPS::GPS(uart_inst_t* pUART)
     : m_pUART(pUART),
+      m_bExit(false),
       m_bFixTime(false),
       m_bFixPos(false),
       m_bExternalAntenna(true),
       m_bGSVInProgress(false),
-      m_pGPSData(NULL),
       m_pSentenceCallBack(nullptr),
       m_pSentenceCtx(nullptr),
       m_pGpsDataCallback(nullptr),
@@ -78,26 +78,22 @@ GPS::GPS(uart_inst_t* pUART)
 
 GPS::~GPS()
 {
-    delete m_pGPSData;
 }
 
-void GPS::setSentenceCallback(void* pCtx, sentenceCallback pCB)
+void GPS::SetSentenceCallback(void* pCtx, sentenceCallback pCB)
 {
-    printf("In GPS::setSentenceCallback()\n");
     m_pSentenceCtx      = pCtx;
     m_pSentenceCallBack = pCB;
 }
 
-void GPS::setGpsDataCallback(void* pCtx, gpsDataCallback pCB)
+void GPS::SetGpsDataCallback(void* pCtx, gpsDataCallback pCB)
 {
-    printf("In GPS::setGpsDataCallback()\n");
     m_pGpsDataCtx      = pCtx;
     m_pGpsDataCallback = pCB;
 }
 
-void GPS::run()
+void GPS::Run()
 {
-    printf("In GPS::run()\n");
     // Set up GPS
     uart_set_fifo_enabled(m_pUART, true);
     sg_pGPS     = this; // Allow interrupt handler to call us back
@@ -109,9 +105,9 @@ void GPS::run()
     // Now enable the UART to send interrupts - RX only
     uart_set_irq_enables(m_pUART, true, false);
 
-    string strSentence;
+    std::string strSentence;
     bool bSentAntennaCommands = false;
-    while (true)
+    while (!m_bExit)
     {
         // Read sentence from GPS device
         tight_loop_contents();
@@ -142,43 +138,41 @@ void GPS::run()
     }
 }
 
-void GPS::processSentence(string strSentence)
+void GPS::processSentence(std::string strSentence)
 {
-    printf("%s", strSentence.c_str());
-
     // Validate the string
     if (!validateSentence(strSentence))
     {
-        printf("Failed to validate NMEA sentence\n");
         return;
     }
+    std::cout << strSentence.c_str() << std::endl;
 
     if (NULL != m_pSentenceCallBack)
     {
         (*m_pSentenceCallBack)(m_pSentenceCtx, strSentence);
     }
 
-    if (NULL == m_pGPSData)
+    if (!m_spGPSData)
     {
         // Guarantee we have an object to update
-        m_pGPSData           = new GPSData;
-        m_pGPSData->vSatList = m_vSatListPersistent; // restore previous data
+        m_spGPSData           = std::make_shared<GPSData>();
+        m_spGPSData->mSatList = m_mSatListPersistent; // restore previous data
     }
 
     // Split the string
-    vector<string> elems;
-    stringstream s_stream(strSentence);
+    std::vector<std::string> elems;
+    std::stringstream s_stream(strSentence);
     while (s_stream.good())
     {
-        string substr;
+        std::string substr;
         getline(s_stream, substr, ','); // get first string delimited by comma
         elems.push_back(substr);
     }
 
     if (time_us_64() > m_nSatListTime + 30 * 1000 * 1000) // Nothing in 30 seconds, clear vectors
     {
-        m_pGPSData->vSatList.clear();
-        m_pGPSData->vUsedList.clear();
+        m_spGPSData->mSatList.clear();
+        m_spGPSData->vUsedList.clear();
     }
 
     if (elems[0] == "$GPGSV")
@@ -186,11 +180,11 @@ void GPS::processSentence(string strSentence)
         // Multipart, clear any previous data and re-gather
         if (elems[2] == "1")
         {
-            m_pGPSData->vSatList.clear();
+            m_spGPSData->mSatList.clear();
             m_strNumGSV      = elems[1];
             m_bGSVInProgress = true;
         }
-        int nNumSatsInGSV = min(4, atoi(elems[3].c_str()) - 4 * (atoi(elems[2].c_str()) - 1));
+        int nNumSatsInGSV = std::min(4, atoi(elems[3].c_str()) - 4 * (atoi(elems[2].c_str()) - 1));
         if (m_bGSVInProgress)
         {
             for (int i = 4; i < 4 + 4 * nNumSatsInGSV; i += 4)
@@ -201,7 +195,7 @@ void GPS::processSentence(string strSentence)
                     uint el   = atoi(elems[i + 1].c_str());
                     uint az   = atoi(elems[i + 2].c_str());
                     uint rssi = elems[i + 3].empty() ? 0 : atoi(elems[i + 3].c_str());
-                    m_pGPSData->vSatList.emplace_back(num, el, az, rssi);
+                    m_spGPSData->mSatList.emplace(std::make_pair(num, SatInfo(num, el, az, rssi)));
                 }
             }
             if (elems[2] == m_strNumGSV) // Last one received
@@ -214,44 +208,44 @@ void GPS::processSentence(string strSentence)
     }
     else if (m_bGSVInProgress) // Did not complete
     {
-        m_pGPSData->vSatList.clear();
-        m_pGPSData->vUsedList.clear();
+        m_spGPSData->mSatList.clear();
+        m_spGPSData->vUsedList.clear();
     }
 
     if (elems[0] == "$GPRMC")
     {
         if (!elems[1].empty())
         {
-            string& t              = elems[1];
-            m_pGPSData->strGPSTime = t.substr(0, 2) + ":" + t.substr(2, 2) + ":" + t.substr(4, 2) + "Z";
-            m_bFixTime             = true;
+            std::string& t          = elems[1];
+            m_spGPSData->strGPSTime = t.substr(0, 2) + ":" + t.substr(2, 2) + ":" + t.substr(4, 2) + "Z";
+            m_bFixTime              = true;
         }
         else
         {
-            m_bFixTime             = false;
-            m_pGPSData->strGPSTime = "";
+            m_bFixTime              = false;
+            m_spGPSData->strGPSTime = "";
         }
         if (elems[2] == "A")
         {
             if (!elems[3].empty() && !elems[4].empty() && !elems[5].empty() && !elems[6].empty())
             {
-                m_bFixPos                = true;
-                m_pGPSData->strLatitude  = convertToDegrees(elems[3], 7) + elems[4];
-                m_pGPSData->strLongitude = convertToDegrees(elems[5], 8) + elems[6];
+                m_bFixPos                 = true;
+                m_spGPSData->strLatitude  = convertToDegrees(elems[3], 7) + elems[4];
+                m_spGPSData->strLongitude = convertToDegrees(elems[5], 8) + elems[6];
             }
             if (!elems[7].empty())
             {
-                double dKnots = stod(elems[7].c_str());
+                double dKnots = std::stod(elems[7].c_str());
                 std::stringstream oss;
                 if (dKnots < 10.0)
                 {
-                    oss << fixed << setfill(' ') << setprecision(1) << dKnots << "kn";
+                    oss << std::fixed << std::setfill(' ') << std::setprecision(1) << dKnots << "kn";
                 }
                 else
                 {
-                    oss << setfill(' ') << setprecision(0) << dKnots << "kn";
+                    oss << std::setfill(' ') << std::setprecision(0) << dKnots << "kn";
                 }
-                m_pGPSData->strSpeedKts = oss.str();
+                m_spGPSData->strSpeedKts = oss.str();
             }
         }
         else
@@ -264,31 +258,31 @@ void GPS::processSentence(string strSentence)
     {
         if (!elems[7].empty())
         {
-            m_pGPSData->strNumSats = "Sat: " + elems[7];
+            m_spGPSData->strNumSats = "Sat: " + elems[7];
         }
         if (!elems[9].empty())
         {
-            double dMeters = stod(elems[9].c_str());
+            double dMeters = std::stod(elems[9].c_str());
             std::stringstream oss;
             if (dMeters < 1000.0)
             {
-                oss << fixed << setfill(' ') << setprecision(1) << dMeters << "m";
+                oss << std::fixed << std::setfill(' ') << std::setprecision(1) << dMeters << "m";
             }
             else
             {
-                oss << setfill(' ') << setprecision(0) << dMeters << "m";
+                oss << std::setfill(' ') << std::setprecision(0) << dMeters << "m";
             }
-            m_pGPSData->strAltitude = oss.str();
+            m_spGPSData->strAltitude = oss.str();
         }
     }
 
     if (elems[0] == "$GPGSA")
     {
-        m_pGPSData->vUsedList.clear();
-        m_pGPSData->strMode3D = elems[2] + "D Fix";
+        m_spGPSData->vUsedList.clear();
+        m_spGPSData->strMode3D = elems[2] + "D Fix";
         if (elems[2] == "1")
         {
-            m_pGPSData->strMode3D = "No Fix";
+            m_spGPSData->strMode3D = "No Fix";
         }
         for (int i = 3; i < 15; ++i)
         {
@@ -297,7 +291,7 @@ void GPS::processSentence(string strSentence)
                 uint satNum = atoi(elems[i].c_str());
                 if (satNum != 0)
                 {
-                    m_pGPSData->vUsedList.push_back(satNum);
+                    m_spGPSData->vUsedList.push_back(satNum);
                 }
             }
             else
@@ -311,9 +305,9 @@ void GPS::processSentence(string strSentence)
     {
         if (NULL != m_pGpsDataCallback)
         {
-            m_vSatListPersistent = m_pGPSData->vSatList; // Persist the list
-            (*m_pGpsDataCallback)(m_pGpsDataCtx, m_pGPSData);
-            m_pGPSData = NULL; // Caller must free
+            m_mSatListPersistent = m_spGPSData->mSatList; // Persist the list
+            (*m_pGpsDataCallback)(m_pGpsDataCtx, m_spGPSData);
+            m_spGPSData.reset();
         }
     }
 
@@ -342,25 +336,22 @@ void GPS::processSentence(string strSentence)
     }
 }
 
-bool GPS::validateSentence(string& strSentence)
+bool GPS::validateSentence(std::string& strSentence)
 {
     // Validate format and remove checksum and CRLF
     size_t nLen = strSentence.size();
     if (nLen < 1 || strSentence[0] != '$')
     {
-        printf("Sentence does not start with $\n");
         return false;
     }
     if (nLen < 6 || strSentence.substr(nLen - 2, 2) != "\r\n" || strSentence[nLen - 5] != '*')
     {
-        printf("Sentence does not end with *XX\\r\\n\n");
         return false;
     }
-    string specifiedCheck  = strSentence.substr(nLen - 4, 2);
-    string calculatedCheck = checkSum(strSentence.substr(1, nLen - 6));
+    std::string specifiedCheck  = strSentence.substr(nLen - 4, 2);
+    std::string calculatedCheck = checkSum(strSentence.substr(1, nLen - 6));
     if (calculatedCheck != specifiedCheck)
     {
-        printf("Failed to validate checksum. Specified: %s, Expected: %s\n", specifiedCheck.c_str(), calculatedCheck.c_str());
         return false;
     }
 
@@ -369,7 +360,7 @@ bool GPS::validateSentence(string& strSentence)
     return true;
 }
 
-string GPS::checkSum(const string& strSentence)
+std::string GPS::checkSum(const std::string& strSentence)
 {
     uint8_t check = 0;
     for (const char& c : strSentence)
@@ -377,11 +368,11 @@ string GPS::checkSum(const string& strSentence)
         check ^= (uint8_t)c;
     }
     std::stringstream oss;
-    oss << hex << uppercase << setw(2) << setfill('0') << (unsigned int)check;
+    oss << std::hex << std::uppercase << std::setw(2) << std::setfill('0') << (unsigned int)check;
     return oss.str();
 }
 
-string GPS::convertToDegrees(string strRaw, int width)
+std::string GPS::convertToDegrees(std::string strRaw, int width)
 {
     // Convert (D)DDMM.mmmm to decimal degrees
     double dRawAsDouble = stod(strRaw);
@@ -389,6 +380,6 @@ string GPS::convertToDegrees(string strRaw, int width)
     int nexttwodigits   = dRawAsDouble - double(firstdigits * 100);
     double converted    = double(firstdigits) + nexttwodigits / 60.0;
     std::stringstream oss;
-    oss << fixed << setw(width) << setfill(' ') << setprecision(4) << converted;
+    oss << std::fixed << std::setw(width) << std::setfill(' ') << std::setprecision(4) << converted;
     return oss.str();
 }

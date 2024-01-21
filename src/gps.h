@@ -1,7 +1,7 @@
 /*
  * GPS class
  *
- * (c) 2023 Erik Tkal
+ * (c) 2024 Erik Tkal
  *
  */
 
@@ -11,8 +11,8 @@
 #include <hardware/uart.h>
 #include <string>
 #include <vector>
-
-using namespace std;
+#include <map>
+#include <memory>
 
 class SatInfo
 {
@@ -34,76 +34,71 @@ public:
     uint m_rssi;
 };
 
-typedef vector<SatInfo> SatList;
-typedef vector<uint> UsedList;
+typedef std::map<uint, SatInfo> SatList;
+typedef std::vector<uint> UsedList;
 
 class GPSData
 {
 public:
-    GPSData()
-    {
-    }
-    ~GPSData()
-    {
-    }
+    typedef std::shared_ptr<GPSData> Shared;
 
-    string strLatitude;
-    string strLongitude;
-    string strAltitude;
-    string strNumSats;
-    string strGPSTime;
-    string strMode3D;
-    string strSpeedKts;
-    SatList vSatList;
+    GPSData()  = default;
+    ~GPSData() = default;
+
+    std::string strLatitude;
+    std::string strLongitude;
+    std::string strAltitude;
+    std::string strNumSats;
+    std::string strGPSTime;
+    std::string strMode3D;
+    std::string strSpeedKts;
+    SatList mSatList;
     UsedList vUsedList;
 };
 
-typedef void (*sentenceCallback)(void* pCtx, string strSentence);
-typedef void (*gpsDataCallback)(void* pCtx, GPSData* pGPSData);
+typedef void (*sentenceCallback)(void* pCtx, std::string strSentence);
+typedef void (*gpsDataCallback)(void* pCtx, GPSData::Shared spGPSData);
 
 class GPS
 {
 public:
+    typedef std::shared_ptr<GPS> Shared;
+
     GPS(uart_inst_t* m_pUART);
     ~GPS();
 
-    void setSentenceCallback(void* pCtx, sentenceCallback pCB);
-    void setGpsDataCallback(void* pCtx, gpsDataCallback pCB);
-
-    void run();
-    uart_inst_t* getUART()
-    {
-        return m_pUART;
-    }
-    void processSentence(string strSentence);
-    bool validateSentence(string& strSentence);
-    string checkSum(const string& strSentence);
-    string convertToDegrees(string strRaw, int width);
-    bool hasTime()
-    {
-        return m_bFixTime;
-    }
-    bool hasPosition()
+    void SetSentenceCallback(void* pCtx, sentenceCallback pCB);
+    void SetGpsDataCallback(void* pCtx, gpsDataCallback pCB);
+    void Run();
+    bool HasPosition()
     {
         return m_bFixPos;
     }
-    bool externalAntenna()
+    bool ExternalAntenna()
     {
         return m_bExternalAntenna;
     }
+    uart_inst_t* GetUART()
+    {
+        return m_pUART;
+    }
 
 private:
-    uart_inst_t* m_pUART;
+    void processSentence(std::string strSentence);
+    bool validateSentence(std::string& strSentence);
+    std::string checkSum(const std::string& strSentence);
+    std::string convertToDegrees(std::string strRaw, int width);
 
+    uart_inst_t* m_pUART;
+    bool m_bExit;
     bool m_bFixTime;
     bool m_bFixPos;
     bool m_bExternalAntenna;
     bool m_bGSVInProgress;
-    string m_strNumGSV;
+    std::string m_strNumGSV;
     uint64_t m_nSatListTime;
-
-    GPSData* m_pGPSData;
-    SatList m_vSatListPersistent;
+    GPSData::Shared m_spGPSData;
+    SatList m_mSatListPersistent;
 
     sentenceCallback m_pSentenceCallBack;
     void* m_pSentenceCtx;
