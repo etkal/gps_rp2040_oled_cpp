@@ -1,13 +1,14 @@
 /*
  * Framebuf class
  *
- * (c) 2023 Erik Tkal
+ * (c) 2024 Erik Tkal
  *
  */
 
 #pragma once
 
 #include "pico/stdlib.h"
+#include <memory>
 
 typedef enum ePixelFormat
 {
@@ -26,22 +27,29 @@ typedef enum ePixelFormat
 #define ELLIPSE_MASK_Q3   (0x04)
 #define ELLIPSE_MASK_Q4   (0x08)
 
+constexpr bool bReverseBytes = true;
+
 class Framebuf
 {
 public:
-    Framebuf(uint16_t nWidth, uint16_t nHeight, ePixelFormat eFormat, bool bRevBytes = false, uint16_t nStride = 0);
+    typedef std::shared_ptr<Framebuf> Shared;
+
+    Framebuf();
     ~Framebuf();
+    void Initialize(uint16_t nWidth, uint16_t nHeight, ePixelFormat eFormat, bool bRevBytes = false, uint16_t nStride = 0);
+
     void setpixel(int x, int y, uint16_t color);
     uint16_t getpixel(int x, int y);
+    void fillrect(int x, int y, int w, int h, uint16_t color);
+
+    void fill(uint16_t color);
     void hline(int x, int y, int w, uint16_t color);
     void vline(int x, int y, int h, uint16_t color);
     void rect(int x, int y, int w, int h, uint16_t color, bool bFill = false);
-    void fillrect(int x, int y, int w, int h, uint16_t color);
-    void fill(uint16_t color);
     void line(int x1, int y1, int x2, int y2, uint16_t color);
     void ellipse(int cx, int cy, int xradius, int yradius, uint16_t color, bool bFill = false, uint8_t mask = ELLIPSE_MASK_ALL);
-    void scroll(int xstep, int ystep);
     void text(const char* str, int x, int y, uint16_t color);
+
     void* buffer()
     {
         return m_pBuf;
@@ -56,9 +64,14 @@ public:
     }
 
 private:
-    void setpixel_checked(int x, int y, uint16_t color, uint8_t mask);
-    void fillrect_checked(int x, int y, int h, int w, uint16_t color);
+    bool check(int& x, int& y);
+    bool check(int& x, int& y, int& h, int& w);
+
     void ellipse_points(int cx, int cy, int x, int y, uint16_t color, uint8_t mask);
+    void setpixel_masked(int x, int y, uint16_t color, uint8_t mask);
+
+    void scroll(int xstep, int ystep);
+
     uint16_t fixcolor(uint16_t color)
     {
         return m_bRevBytes ? __builtin_bswap16(color) : color;

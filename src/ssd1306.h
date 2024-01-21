@@ -46,35 +46,57 @@
 #define OLED_WRITE_MODE          0xFE
 #define OLED_READ_MODE           0xFF
 
-enum eOLEDColours
-{
-    oled_black = 0,
-    oled_white = 1,
-    oled_off   = 0,
-    oled_on    = 1,
-};
+// All colours for this display are white
+constexpr auto COLOUR_WHITE = 1;
+constexpr auto COLOUR_BLACK = 0;
+constexpr auto COLOUR_BLUE = 1;
+constexpr auto COLOUR_RED = 1;
 
 class SSD1306 : public Framebuf
 {
 public:
-    SSD1306(uint nWidth, uint nHeight, ePixelFormat format, bool bExternalVcc);
-    virtual ~SSD1306(){};
+    typedef std::shared_ptr<SSD1306> Shared;
 
-    void init();
-    void powerOff();
-    void powerOn();
-    void contrast(uint8_t contrast);
-    void invert(bool bInvert);
-    void rotate(bool bRotate);
-    void show();
+    SSD1306(uint nWidth, uint nHeight, bool bExternalVcc);
+    virtual ~SSD1306() = default;
+
+    void Reset();
+    void Initialize();
+    void DisplayOff();
+    void DisplayOn();
+    void SetContrast(uint8_t contrast);
+    void Invert(bool bInvert);
+    void Rotate(bool bRotate);
+    void Show();
+
+    // Framebuff shim methods
+    void SetPixel(int x, int y, uint16_t color);
+    uint16_t GetPixel(int x, int y);
+    void FillRect(int x, int y, int w, int h, uint16_t color);
+    void Fill(uint16_t color);
+    void HLine(int x, int y, int w, uint16_t color);
+    void VLine(int x, int y, int h, uint16_t color);
+    void Rect(int x, int y, int w, int h, uint16_t color, bool bFill = false);
+    void Line(int x1, int y1, int x2, int y2, uint16_t color);
+    void Ellipse(int cx, int cy, int xradius, int yradius, uint16_t color, bool bFill = false, uint8_t mask = ELLIPSE_MASK_ALL);
+    void Text(const char* str, int x, int y, uint16_t color);
+
+    uint16_t Width()
+    {
+        return m_dispWidth;
+    }
+    uint16_t Height()
+    {
+        return m_dispHeight;
+    }
 
 private:
     virtual void initInternal()                      = 0;
     virtual void write_cmd(uint8_t cmd)              = 0;
     virtual void write_data(uint8_t* buf, uint nLen) = 0;
 
-    uint m_nWidth;
-    uint m_nHeight;
+    uint16_t m_dispWidth;
+    uint16_t m_dispHeight;
     bool m_bExternalVcc;
     uint m_nPages;
 };
@@ -82,13 +104,13 @@ private:
 class SSD1306_I2C : public SSD1306
 {
 public:
-    SSD1306_I2C(uint nWidth, uint nHeight, ePixelFormat format, i2c_inst_t* i2c, uint8_t addr = 0x3C, bool bExternalVcc = false);
-    virtual ~SSD1306_I2C();
+    SSD1306_I2C(uint nWidth, uint nHeight, i2c_inst_t* i2c, uint8_t addr = 0x3C, bool bExternalVcc = false);
+    virtual ~SSD1306_I2C() = default;
 
 private:
-    virtual void initInternal();
-    virtual void write_cmd(uint8_t cmd);
-    virtual void write_data(uint8_t* buf, uint nLen);
+    void initInternal() override;
+    void write_cmd(uint8_t cmd) override;
+    void write_data(uint8_t* buf, uint nLen) override;
 
     i2c_inst_t* m_i2c;
     uint8_t m_addr;
