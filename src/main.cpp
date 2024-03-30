@@ -107,7 +107,7 @@ int main()
     // Create the display
     SSD1306::Shared spDisplay = std::make_shared<SSD1306_I2C>(128, 64, I2C_DEVICE);
 
-    // Create the GPS_TFT display object
+    // Create the GPS_OLED display object
     GPS_OLED::Shared spDevice = std::make_shared<GPS_OLED>(spDisplay, spGPS, spLED, GPSD_GMT_OFFSET);
 
     spDevice->Initialize();

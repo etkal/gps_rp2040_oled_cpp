@@ -51,7 +51,7 @@ public:
     std::string strNumSats;
     std::string strGPSTime;
     std::string strMode3D;
-    std::string strSpeedKts;
+    std::string strSpeed;
     SatList mSatList;
     UsedList vUsedList;
 };

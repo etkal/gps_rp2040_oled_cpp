@@ -156,7 +156,7 @@ void GPS_OLED::updateUI(GPSData::Shared spGPSData)
         drawText(0, spGPSData->strLatitude, COLOUR_WHITE, true, X_PAD);
         drawText(1, spGPSData->strLongitude, COLOUR_WHITE, true, X_PAD);
         drawText(2, spGPSData->strAltitude, COLOUR_WHITE, true, X_PAD);
-        // drawText(5, pGPSData->strSpeedKts, COLOUR_WHITE, true, X_PAD);
+        drawText(5, spGPSData->strSpeed, COLOUR_WHITE, true, X_PAD);
     }
 
 #if defined(VOLTAGE_DISPLAY)

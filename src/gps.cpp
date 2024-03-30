@@ -236,16 +236,17 @@ void GPS::processSentence(std::string strSentence)
             if (!elems[7].empty())
             {
                 double dKnots = std::stod(elems[7].c_str());
+                double dMph = dKnots * 1.15078;
                 std::stringstream oss;
-                if (dKnots < 10.0)
+                if (dMph < 10.0)
                 {
-                    oss << std::fixed << std::setfill(' ') << std::setprecision(1) << dKnots << "kn";
+                    oss << std::fixed << std::setfill(' ') << std::setprecision(1) << dMph << "mph";
                 }
                 else
                 {
-                    oss << std::setfill(' ') << std::setprecision(0) << dKnots << "kn";
+                    oss << std::setfill(' ') << std::setprecision(0) << dMph << "mph";
                 }
-                m_spGPSData->strSpeedKts = oss.str();
+                m_spGPSData->strSpeed = oss.str();
             }
         }
         else
