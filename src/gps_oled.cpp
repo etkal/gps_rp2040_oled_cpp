@@ -1,7 +1,7 @@
 /*
  * GPS using OLED display
  *
- * Copyright (c) 2023 Erik Tkal
+ * Copyright (c) 2025 Erik Tkal
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -109,16 +109,15 @@ void GPS_OLED::updateUI(GPSData::Shared spGPSData)
     m_spGPSData = spGPSData;
     if (m_spLED)
     {
-        if (m_spGPS->HasPosition())
+        if (m_spGPSData->bHasPosition)
         {
-            m_spLED->SetPixel(0, m_spGPS->ExternalAntenna() ? led_blue : led_green);
-            m_spLED->Blink_ms(20);
+            m_spLED->SetPixel(0, m_spGPSData->bExternalAntenna ? led_blue : led_green);
         }
         else
         {
-            m_spLED->SetPixel(0, led_red);
-            m_spLED->Blink_ms(20);
+            m_spLED->SetPixel(0, m_spGPSData->bExternalAntenna ? led_magenta : led_red);
         }
+        m_spLED->Blink_ms(20);
     }
 
     uint16_t nWidth  = m_spDisplay->Width();
@@ -133,7 +132,7 @@ void GPS_OLED::updateUI(GPSData::Shared spGPSData)
         power_source(&bBattery);
         vsys = floorf(vsys * 100) / 100;
         std::stringstream oss;
-        oss << (bBattery ? "batt: " : "vsys: ") << std::fixed << std::setfill(' ') << std::setprecision(1) << vsys << "v";
+        oss << (bBattery ? "b:" : "") << std::fixed << std::setfill(' ') << std::setprecision(1) << vsys << "V";
         strVsys = oss.str();
     }
 #endif
@@ -143,9 +142,9 @@ void GPS_OLED::updateUI(GPSData::Shared spGPSData)
     // Draw satellite grid
     drawSatGrid(nWidth / 4, nHeight / 2, nHeight / 2 - CHAR_HEIGHT / 2, 2);
 
-    // Draw upper right text
+    // Draw fix and #sats text
+    drawText(0, spGPSData->strMode3D, COLOUR_WHITE, false, X_PAD);
     drawText(3, spGPSData->strNumSats, COLOUR_WHITE, true, X_PAD);
-    drawText(4, spGPSData->strMode3D, COLOUR_WHITE, true, X_PAD);
 
     if (!spGPSData->strGPSTime.empty())
     {
@@ -156,7 +155,7 @@ void GPS_OLED::updateUI(GPSData::Shared spGPSData)
         drawText(0, spGPSData->strLatitude, COLOUR_WHITE, true, X_PAD);
         drawText(1, spGPSData->strLongitude, COLOUR_WHITE, true, X_PAD);
         drawText(2, spGPSData->strAltitude, COLOUR_WHITE, true, X_PAD);
-        drawText(5, spGPSData->strSpeed, COLOUR_WHITE, true, X_PAD);
+        drawText(4, spGPSData->strSpeed, COLOUR_WHITE, true, X_PAD);
     }
 
 #if defined(VOLTAGE_DISPLAY)
@@ -172,7 +171,7 @@ void GPS_OLED::updateUI(GPSData::Shared spGPSData)
     m_spGPSData.reset();
 
 #if !defined(NDEBUG)
-    std::cout << "Total Heap: " << getTotalHeap() << "  Free Heap: " << getFreeHeap() << std::endl;
+    printf("Total Heap: %d  Free Heap: %d\n", getTotalHeap(), getFreeHeap());
 #endif
 }
 

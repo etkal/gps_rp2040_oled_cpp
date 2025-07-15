@@ -1,13 +1,14 @@
 cmake_minimum_required(VERSION 3.24)
 
 # Set the board type for pin and LED decisions
-set(PICO_BOARD pico)
+#set(PICO_BOARD pico)
 #set(PICO_BOARD pico_w)
-#set(PICO_BOARD waveshare_rp2040_zero)
+set(PICO_BOARD waveshare_rp2040_zero)
 #set(PICO_BOARD seeed_xiao_rp2040)
 
 # GMT Offset for clock display (if used)
 # add_compile_definitions(GPSD_GMT_OFFSET=-5.0)
+
 # Enable to display VSYS voltage
 # add_compile_definitions(VOLTAGE_DISPLAY)
 
@@ -20,6 +21,7 @@ include(pico_sdk_import.cmake)
 project(gps_oled C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
+set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 # initialize the Raspberry Pi Pico SDK
 pico_sdk_init()
 

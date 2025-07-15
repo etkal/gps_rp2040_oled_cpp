@@ -1,7 +1,7 @@
 /*
  * GPS class
  *
- * Copyright (c) 2024 Erik Tkal
+ * Copyright (c) 2025 Erik Tkal
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,46 +29,43 @@
 #include "gps.h"
 #include <pico/sync.h>
 
-
-static GPS* sg_pGPS = NULL;
-static char szSentence[256];
-static uint nRead = 0;
-static critical_section_t critsec;
-
-static std::queue<std::string> sg_sentenceQueue;
-
-// RX interrupt handler
-static void on_uart_rx()
+typedef enum eSentenceType
 {
-    uart_inst_t* pUART = sg_pGPS->GetUART();
-    while (uart_is_readable(pUART))
-    {
-        char ch             = uart_getc(pUART);
-        szSentence[nRead++] = ch;
-        if (ch == '\n')
-        {
-            szSentence[nRead++]  = '\0';
-            std::string sentence = szSentence;
-            nRead                = 0;
-            critical_section_enter_blocking(&critsec);
-            sg_sentenceQueue.push(sentence);
-            critical_section_exit(&critsec);
-        }
-        if (nRead >= sizeof(szSentence))
-        {
-            nRead = 0;
-            break;
-        }
-    }
-}
+    kGPGGA,
+    kGPGSA,
+    kGPGSV,
+    kGPRMC,
+    kGPVTG,
+    kPGTOP,
+    kPCD,
+} eSentenceType;
 
-GPS::GPS(uart_inst_t* pUART)
-    : m_pUART(pUART),
+static std::map<std::string, eSentenceType> g_SentenceTypeMap = {
+    {"$GPGGA", kGPGGA},
+    {"$GPGSA", kGPGSA},
+    {"$GPGSV", kGPGSV},
+    {"$GPRMC", kGPRMC},
+    {"$GPVTG", kGPVTG},
+    {"$PGTOP", kPGTOP},
+    {"$PCDP",  kPCD  },
+};
+
+static GPS* sg_pGPS          = NULL;
+static uart_inst_t* sg_pUART = nullptr;
+
+// Static members for RX
+char GPS::sm_szBuffer[GPS_BUFSIZE];
+volatile size_t GPS::sm_iHead      = 0;
+volatile size_t GPS::sm_iNext      = 0;
+volatile size_t GPS::sm_nSentences = 0;
+
+GPS::GPS(uart_inst_t* pUART0, uart_inst_t* pUART1)
+    : m_pUART0(pUART0),
+      m_pUART1(pUART1),
       m_bExit(false),
-      m_bFixTime(false),
-      m_bFixPos(false),
-      m_bExternalAntenna(true),
       m_bGSVInProgress(false),
+      m_nSatListTime(0),
+      m_bSendGpsData(false),
       m_pSentenceCallBack(nullptr),
       m_pSentenceCtx(nullptr),
       m_pGpsDataCallback(nullptr),
@@ -94,58 +91,69 @@ void GPS::SetGpsDataCallback(void* pCtx, gpsDataCallback pCB)
 
 void GPS::Run()
 {
+#if !defined(NDEBUG)
+    sleep_ms(10000);
+#endif
+
     // Set up GPS
-    uart_set_fifo_enabled(m_pUART, true);
+    uart_set_fifo_enabled(m_pUART0, true);
     sg_pGPS     = this; // Allow interrupt handler to call us back
-    int uartIRQ = m_pUART == uart0 ? UART0_IRQ : UART1_IRQ;
+    sg_pUART    = m_pUART0;
+    int uartIRQ = m_pUART0 == uart0 ? UART0_IRQ : UART1_IRQ;
     // Set up and enable the interrupt handler
     irq_set_exclusive_handler(uartIRQ, on_uart_rx);
     irq_set_enabled(uartIRQ, true);
-    critical_section_init(&critsec);
     // Now enable the UART to send interrupts - RX only
-    uart_set_irq_enables(m_pUART, true, false);
+    uart_set_irqs_enabled(m_pUART0, true, false);
 
     std::string strSentence;
     bool bSentAntennaCommands = false;
     while (!m_bExit)
     {
-        // Read sentence from GPS device
         tight_loop_contents();
-        // sleep_ms(1);
-        bool bSentenceAvailable = false;
-        critical_section_enter_blocking(&critsec);
-        if (!sg_sentenceQueue.empty())
-        {
-            strSentence = sg_sentenceQueue.front();
-            sg_sentenceQueue.pop();
-            bSentenceAvailable = true;
-        }
-        critical_section_exit(&critsec);
 
-        if (bSentenceAvailable)
+        // Read sentence from GPS device
+        if (getSentence(strSentence))
         {
-            processSentence(strSentence);
-            bSentenceAvailable = false;
-            if (!bSentAntennaCommands)
+            bool bValidSentenceRead = processSentence(strSentence);
+
+            if (nullptr != m_pUART1 && bValidSentenceRead)
             {
+                uart_puts(m_pUART1, strSentence.c_str()); // Echo to the listening port
+            }
+
+            if (!bSentAntennaCommands && bValidSentenceRead)
+            {
+                printf("Sending antenna commands\n");
                 // Write commands to enable reporting external vs internal antenna.  We wait
                 // until some data is received to ensure the GPS has finished initializing.
-                uart_puts(m_pUART, "$PGCMD,33,1*6C\r\n"); // Enable antenna output for PA6H
-                uart_puts(m_pUART, "$CDCMD,33,1*7C\r\n"); // Enable antenna output for PA1616S
+                std::string strPGCMD("$PGCMD,33,1*6C\r\n"); // Enable antenna output for PA6H
+                std::string strCDCMD("$CDCMD,33,1*7C\r\n"); // Enable antenna output for PA1616S
+                uart_write_blocking(m_pUART0, (const uint8_t*)strPGCMD.c_str(), strPGCMD.length());
+                uart_write_blocking(m_pUART0, (const uint8_t*)strCDCMD.c_str(), strCDCMD.length());
                 bSentAntennaCommands = true;
+            }
+        }
+
+        if (m_bSendGpsData)
+        {
+            m_bSendGpsData = false;
+            if (NULL != m_pGpsDataCallback)
+            {
+                (*m_pGpsDataCallback)(m_pGpsDataCtx, m_spGPSData);
             }
         }
     }
 }
 
-void GPS::processSentence(std::string strSentence)
+bool GPS::processSentence(std::string strSentence)
 {
     // Validate the string
     if (!validateSentence(strSentence))
     {
-        return;
+        return false;
     }
-    std::cout << strSentence.c_str() << std::endl;
+    printf("%s\n", strSentence.c_str());
 
     if (NULL != m_pSentenceCallBack)
     {
@@ -156,87 +164,154 @@ void GPS::processSentence(std::string strSentence)
     {
         // Guarantee we have an object to update
         m_spGPSData           = std::make_shared<GPSData>();
-        m_spGPSData->mSatList = m_mSatListPersistent; // restore previous data
+        m_spGPSData->mSatList = m_mSatListPersistent; // restore any previous data
     }
 
-    // Split the string
-    std::vector<std::string> elems;
+    std::vector<std::string> vElems;
     std::stringstream s_stream(strSentence);
     while (s_stream.good())
     {
         std::string substr;
         getline(s_stream, substr, ','); // get first string delimited by comma
-        elems.push_back(substr);
+        vElems.push_back(substr);
     }
 
     if (time_us_64() > m_nSatListTime + 30 * 1000 * 1000) // Nothing in 30 seconds, clear vectors
     {
-        m_spGPSData->mSatList.clear();
-        m_spGPSData->vUsedList.clear();
+        if (!m_spGPSData->mSatList.empty())
+        {
+            printf("Clearing vectors\n");
+            m_spGPSData->mSatList.clear();
+            m_spGPSData->vUsedList.clear();
+        }
     }
 
-    if (elems[0] == "$GPGSV")
+    if (vElems.size() == 0)
+    {
+        printf("No elements found\n");
+        return false;
+    }
+
+    if (g_SentenceTypeMap.find(vElems[0]) == g_SentenceTypeMap.end())
+    {
+        printf("Not handling %s\n", vElems[0].c_str());
+        return false;
+    }
+
+    auto type = g_SentenceTypeMap.at(vElems[0]);
+
+    if (m_bGSVInProgress && type != kGPGSV) // Did not complete
+    {
+        m_bGSVInProgress = false;
+        m_mSatListIncoming.clear();
+    }
+
+    switch (type)
+    {
+    case kGPGGA: // Global Positioning System Fix Data
+    {
+        m_bSendGpsData = true;
+        if (!vElems[7].empty())
+        {
+            m_spGPSData->strNumSats = "Sat: " + vElems[7];
+        }
+        if (!vElems[9].empty())
+        {
+            double dMeters = std::stod(vElems[9].c_str());
+            std::stringstream oss;
+            if (dMeters < 1000.0)
+            {
+                oss << std::fixed << std::setfill(' ') << std::setprecision(1) << dMeters << "m";
+            }
+            else
+            {
+                oss << std::setfill(' ') << std::setprecision(0) << dMeters << "m";
+            }
+            m_spGPSData->strAltitude = oss.str();
+        }
+        break;
+    }
+    case kGPGSA: // GPS DOP and active satellites
+    {
+        m_spGPSData->vUsedList.clear();
+        m_spGPSData->strMode3D = vElems[2] + "D";
+        if (vElems[2] == "1")
+        {
+            m_spGPSData->strMode3D = "";
+        }
+        for (int i = 3; i < 15; ++i)
+        {
+            if (!vElems[i].empty())
+            {
+                uint satNum = atoi(vElems[i].c_str());
+                if (satNum != 0)
+                {
+                    m_spGPSData->vUsedList.push_back(satNum);
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+        break;
+    }
+    case kGPGSV: // GPS Satellites in view
     {
         // Multipart, clear any previous data and re-gather
-        if (elems[2] == "1")
+        if (vElems[2] == "1")
         {
-            m_spGPSData->mSatList.clear();
-            m_strNumGSV      = elems[1];
+            m_mSatListIncoming.clear();
+            m_strNumGSV      = vElems[1];
             m_bGSVInProgress = true;
         }
-        int nNumSatsInGSV = std::min(4, atoi(elems[3].c_str()) - 4 * (atoi(elems[2].c_str()) - 1));
+        int nNumSatsInGSV = std::min(4, atoi(vElems[3].c_str()) - 4 * (atoi(vElems[2].c_str()) - 1));
         if (m_bGSVInProgress)
         {
             for (int i = 4; i < 4 + 4 * nNumSatsInGSV; i += 4)
             {
-                if (!elems[i].empty() && !elems[i + 1].empty() && !elems[i + 2].empty())
+                if (!vElems[i].empty() && !vElems[i + 1].empty() && !vElems[i + 2].empty())
                 {
-                    uint num  = atoi(elems[i].c_str());
-                    uint el   = atoi(elems[i + 1].c_str());
-                    uint az   = atoi(elems[i + 2].c_str());
-                    uint rssi = elems[i + 3].empty() ? 0 : atoi(elems[i + 3].c_str());
-                    m_spGPSData->mSatList.emplace(std::make_pair(num, SatInfo(num, el, az, rssi)));
+                    uint num  = atoi(vElems[i].c_str());
+                    uint el   = atoi(vElems[i + 1].c_str());
+                    uint az   = atoi(vElems[i + 2].c_str());
+                    uint rssi = vElems[i + 3].empty() ? 0 : atoi(vElems[i + 3].c_str());
+                    m_mSatListIncoming.emplace(std::make_pair(num, SatInfo(num, el, az, rssi)));
                 }
             }
-            if (elems[2] == m_strNumGSV) // Last one received
+            if (vElems[2] == m_strNumGSV) // Last one received
             {
-                m_bGSVInProgress = false;
-                m_nSatListTime   = time_us_64();
+                m_bGSVInProgress      = false;
+                m_nSatListTime        = time_us_64();
+                m_spGPSData->mSatList = m_mSatListIncoming;
+                m_mSatListPersistent  = m_spGPSData->mSatList; // Persist the list
             }
         }
-        return;
+        break;
     }
-    else if (m_bGSVInProgress) // Did not complete
+    case kGPRMC: // Recommended minimum specific GPS/Transit data
     {
-        m_spGPSData->mSatList.clear();
-        m_spGPSData->vUsedList.clear();
-    }
-
-    if (elems[0] == "$GPRMC")
-    {
-        if (!elems[1].empty())
+        if (!vElems[1].empty())
         {
-            std::string& t          = elems[1];
+            std::string& t          = vElems[1];
             m_spGPSData->strGPSTime = t.substr(0, 2) + ":" + t.substr(2, 2) + ":" + t.substr(4, 2) + "Z";
-            m_bFixTime              = true;
         }
         else
         {
-            m_bFixTime              = false;
             m_spGPSData->strGPSTime = "";
         }
-        if (elems[2] == "A")
+        if (vElems[2] == "A")
         {
-            if (!elems[3].empty() && !elems[4].empty() && !elems[5].empty() && !elems[6].empty())
+            if (!vElems[3].empty() && !vElems[4].empty() && !vElems[5].empty() && !vElems[6].empty())
             {
-                m_bFixPos                 = true;
-                m_spGPSData->strLatitude  = convertToDegrees(elems[3], 7) + elems[4];
-                m_spGPSData->strLongitude = convertToDegrees(elems[5], 8) + elems[6];
+                m_spGPSData->bHasPosition = true;
+                m_spGPSData->strLatitude  = convertToDegrees(vElems[3], 7) + vElems[4];
+                m_spGPSData->strLongitude = convertToDegrees(vElems[5], 8) + vElems[6];
             }
-            if (!elems[7].empty())
+            if (!vElems[7].empty())
             {
-                double dKnots = std::stod(elems[7].c_str());
-                double dMph = dKnots * 1.15078;
+                double dKnots = std::stod(vElems[7].c_str());
+                double dMph   = dKnots * 1.15078;
                 std::stringstream oss;
                 if (dMph < 10.0)
                 {
@@ -251,90 +326,38 @@ void GPS::processSentence(std::string strSentence)
         }
         else
         {
-            m_bFixPos = false;
+            m_spGPSData->bHasPosition = false;
         }
+        break;
     }
-
-    if (elems[0] == "$GPGGA")
+    case kPGTOP: // PA6H External antenna info
     {
-        if (!elems[7].empty())
+        if (vElems[2] == "2")
         {
-            m_spGPSData->strNumSats = "Sat: " + elems[7];
+            m_spGPSData->bExternalAntenna = false;
         }
-        if (!elems[9].empty())
+        if (vElems[2] == "3")
         {
-            double dMeters = std::stod(elems[9].c_str());
-            std::stringstream oss;
-            if (dMeters < 1000.0)
-            {
-                oss << std::fixed << std::setfill(' ') << std::setprecision(1) << dMeters << "m";
-            }
-            else
-            {
-                oss << std::setfill(' ') << std::setprecision(0) << dMeters << "m";
-            }
-            m_spGPSData->strAltitude = oss.str();
+            m_spGPSData->bExternalAntenna = true;
         }
+        break;
     }
-
-    if (elems[0] == "$GPGSA")
+    case kPCD: // PA1616S External antenna info
     {
-        m_spGPSData->vUsedList.clear();
-        m_spGPSData->strMode3D = elems[2] + "D Fix";
-        if (elems[2] == "1")
+        if (vElems[2] == "1")
         {
-            m_spGPSData->strMode3D = "No Fix";
+            m_spGPSData->bExternalAntenna = false;
         }
-        for (int i = 3; i < 15; ++i)
+        if (vElems[2] == "2")
         {
-            if (!elems[i].empty())
-            {
-                uint satNum = atoi(elems[i].c_str());
-                if (satNum != 0)
-                {
-                    m_spGPSData->vUsedList.push_back(satNum);
-                }
-            }
-            else
-            {
-                break;
-            }
+            m_spGPSData->bExternalAntenna = true;
         }
+        break;
     }
-
-    if (elems[0] == "$GPRMC")
-    {
-        if (NULL != m_pGpsDataCallback)
-        {
-            m_mSatListPersistent = m_spGPSData->mSatList; // Persist the list
-            (*m_pGpsDataCallback)(m_pGpsDataCtx, m_spGPSData);
-            m_spGPSData.reset();
-        }
+    default:
+        break;
     }
-
-    if (elems[0] == "$PGTOP") // PA6H
-    {
-        if (elems[2] == "2")
-        {
-            m_bExternalAntenna = false;
-        }
-        if (elems[2] == "3")
-        {
-            m_bExternalAntenna = true;
-        }
-    }
-
-    if (elems[0] == "$PCD") // PA1616S
-    {
-        if (elems[2] == "1")
-        {
-            m_bExternalAntenna = false;
-        }
-        if (elems[2] == "2")
-        {
-            m_bExternalAntenna = true;
-        }
-    }
+    return true;
 }
 
 bool GPS::validateSentence(std::string& strSentence)
@@ -383,4 +406,43 @@ std::string GPS::convertToDegrees(std::string strRaw, int width)
     std::stringstream oss;
     oss << std::fixed << std::setw(width) << std::setfill(' ') << std::setprecision(4) << converted;
     return oss.str();
+}
+
+// RX interrupt handler
+void GPS::on_uart_rx()
+{
+    uart_set_irqs_enabled(sg_pUART, false, false);
+    while (uart_is_readable(sg_pUART))
+    {
+        char ch                 = uart_getc(sg_pUART);
+        sm_szBuffer[sm_iNext++] = ch;
+        sm_iNext %= GPS_BUFSIZE;
+        if (ch == '\n')
+        {
+            sm_szBuffer[sm_iNext++] = '\0';
+            sm_iNext %= GPS_BUFSIZE;
+            sm_nSentences += 1;
+        }
+    }
+    uart_set_irqs_enabled(sg_pUART, true, false);
+}
+
+bool GPS::getSentence(std::string& strSentence)
+{
+    bool bFound = false;
+    uart_set_irqs_enabled(sg_pUART, false, false);
+    if (sm_nSentences > 0)
+    {
+        strSentence.clear();
+        for (size_t i = sm_iHead; '\0' != sm_szBuffer[i]; i = (i + 1) % GPS_BUFSIZE)
+        {
+            strSentence += sm_szBuffer[i];
+        }
+        sm_iHead = (sm_iHead + strSentence.length() + 1) % GPS_BUFSIZE;
+        sm_nSentences -= 1;
+        bFound = true;
+    }
+    uart_set_irqs_enabled(sg_pUART, true, false);
+
+    return bFound;
 }
