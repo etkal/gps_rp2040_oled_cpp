@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2023 Erik Tkal
+ * Copyright (c) 2025 Erik Tkal
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,17 +31,30 @@
 
 #include "gps_oled.h"
 
-#define UART_DEVICE    uart_default             // Default is uart0
-#define PIN_UART_TX    PICO_DEFAULT_UART_TX_PIN // Default is 0
-#define PIN_UART_RX    PICO_DEFAULT_UART_RX_PIN // Default is 1
+#define UART0_DEVICE uart0                    // Default is uart0
+#define PIN_UART0_TX PICO_DEFAULT_UART_TX_PIN // Default is 0
+#define PIN_UART0_RX PICO_DEFAULT_UART_RX_PIN // Default is 1
+
+#if defined(WAVESHARE_RP2040_ZERO)
+#define UART1_DEVICE uart1 // uart1 for echo
+#define PIN_UART1_TX 4
+#define PIN_UART1_RX 5
+#endif
+
 #define UART_BAUD_RATE 9600
 #define DATA_BITS      8
 #define STOP_BITS      1
 #define PARITY         UART_PARITY_NONE
 
-#define I2C_DEVICE     i2c_default
-#define PIN_SDA        PICO_DEFAULT_I2C_SDA_PIN
-#define PIN_SCL        PICO_DEFAULT_I2C_SCL_PIN
+#if defined(WAVESHARE_RP2040_ZERO)
+#define I2C_DEVICE i2c1
+#define PIN_SDA    2
+#define PIN_SCL    3
+#else
+#define I2C_DEVICE i2c_default
+#define PIN_SDA    PICO_DEFAULT_I2C_SDA_PIN
+#define PIN_SCL    PICO_DEFAULT_I2C_SCL_PIN
+#endif
 
 // #define USE_WS2812_PIN 12 // Override
 // #define USE_LED_PIN 16    // Override
@@ -56,11 +69,20 @@ int main()
     adc_init();
 
     // Set up UART for GPS device
-    uart_init(UART_DEVICE, UART_BAUD_RATE);
-    gpio_set_function(PIN_UART_TX, GPIO_FUNC_UART);
-    gpio_set_function(PIN_UART_RX, GPIO_FUNC_UART);
-    uart_set_hw_flow(UART_DEVICE, false, false);
-    uart_set_format(UART_DEVICE, DATA_BITS, STOP_BITS, PARITY);
+    uart_init(UART0_DEVICE, UART_BAUD_RATE);
+    gpio_set_function(PIN_UART0_TX, GPIO_FUNC_UART);
+    gpio_set_function(PIN_UART0_RX, GPIO_FUNC_UART);
+    uart_set_hw_flow(UART0_DEVICE, false, false);
+    uart_set_format(UART0_DEVICE, DATA_BITS, STOP_BITS, PARITY);
+
+#if defined(UART1_DEVICE)
+    // Set up UART for echo device
+    uart_init(UART1_DEVICE, UART_BAUD_RATE);
+    gpio_set_function(PIN_UART1_TX, GPIO_FUNC_UART);
+    gpio_set_function(PIN_UART1_RX, GPIO_FUNC_UART);
+    uart_set_hw_flow(UART1_DEVICE, false, false);
+    uart_set_format(UART1_DEVICE, DATA_BITS, STOP_BITS, PARITY);
+#endif
 
     // Set up the OLED display
     i2c_init(I2C_DEVICE, 400 * 1000);
@@ -101,8 +123,12 @@ int main()
     spLED->SetIgnore({led_red});
 #endif
 
-    // Create the GPS object
-    GPS::Shared spGPS = std::make_shared<GPS>(UART_DEVICE);
+// Create the GPS object
+#if defined(UART1_DEVICE)
+    GPS::Shared spGPS = std::make_shared<GPS>(UART0_DEVICE, UART1_DEVICE);
+#else
+    GPS::Shared spGPS = std::make_shared<GPS>(UART0_DEVICE);
+#endif
 
     // Create the display
     SSD1306::Shared spDisplay = std::make_shared<SSD1306_I2C>(128, 64, I2C_DEVICE);

@@ -1,7 +1,7 @@
 /*
  * GPS class
  *
- * (c) 2024 Erik Tkal
+ * (c) 2025 Erik Tkal
  *
  */
 
@@ -42,9 +42,15 @@ class GPSData
 public:
     typedef std::shared_ptr<GPSData> Shared;
 
-    GPSData()  = default;
+    GPSData()
+        : bHasPosition(false),
+          bExternalAntenna(false)
+    {
+    }
     ~GPSData() = default;
 
+    bool bHasPosition;
+    bool bExternalAntenna;
     std::string strLatitude;
     std::string strLongitude;
     std::string strAltitude;
@@ -59,45 +65,49 @@ public:
 typedef void (*sentenceCallback)(void* pCtx, std::string strSentence);
 typedef void (*gpsDataCallback)(void* pCtx, GPSData::Shared spGPSData);
 
+auto constexpr GPS_BUFSIZE            = 4096; // Circular buffer size
+
 class GPS
 {
 public:
     typedef std::shared_ptr<GPS> Shared;
 
-    GPS(uart_inst_t* m_pUART);
+    GPS(uart_inst_t* pUART0, uart_inst_t* pUART1 = nullptr);
     ~GPS();
 
     void SetSentenceCallback(void* pCtx, sentenceCallback pCB);
     void SetGpsDataCallback(void* pCtx, gpsDataCallback pCB);
     void Run();
-    bool HasPosition()
-    {
-        return m_bFixPos;
-    }
-    bool ExternalAntenna()
-    {
-        return m_bExternalAntenna;
-    }
     uart_inst_t* GetUART()
     {
-        return m_pUART;
+        return m_pUART0;
     }
 
 private:
-    void processSentence(std::string strSentence);
+    bool processSentence(std::string strSentence);
     bool validateSentence(std::string& strSentence);
     std::string checkSum(const std::string& strSentence);
     std::string convertToDegrees(std::string strRaw, int width);
 
-    uart_inst_t* m_pUART;
+    uart_inst_t* m_pUART0;
+    uart_inst_t* m_pUART1; // output echo
+
+    // RX buffer management
+    static char sm_szBuffer[GPS_BUFSIZE];
+    static volatile size_t sm_iHead;
+    static volatile size_t sm_iNext;
+    static volatile size_t sm_nSentences;
+    static void on_uart_rx();
+    static bool getSentence(std::string& strSentence);
+
+    // GPS object members
     bool m_bExit;
-    bool m_bFixTime;
-    bool m_bFixPos;
-    bool m_bExternalAntenna;
     bool m_bGSVInProgress;
     std::string m_strNumGSV;
     uint64_t m_nSatListTime;
+    bool m_bSendGpsData;
     GPSData::Shared m_spGPSData;
+    SatList m_mSatListIncoming;
     SatList m_mSatListPersistent;
 
     sentenceCallback m_pSentenceCallBack;
