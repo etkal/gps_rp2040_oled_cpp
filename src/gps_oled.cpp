@@ -144,6 +144,7 @@ void GPS_OLED::updateUI(GPSData::Shared spGPSData)
 
     // Draw fix and #sats text
     drawText(0, spGPSData->strMode3D, COLOUR_WHITE, false, X_PAD);
+    drawText(-1, m_spGPSData->bExternalAntenna ? "*" : " ", COLOUR_WHITE, false, X_PAD);
     drawText(3, spGPSData->strNumSats, COLOUR_WHITE, true, X_PAD);
 
     if (!spGPSData->strGPSTime.empty())

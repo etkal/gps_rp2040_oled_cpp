@@ -98,13 +98,21 @@ private:
 };
 
 #if defined(RASPBERRYPI_PICO_W)
-class LED_pico_w : public LED_pico
+class LED_pico_w : public LED
 {
 public:
     LED_pico_w(uint pin);
     virtual ~LED_pico_w();
 
-    void On();
-    void Off();
+    void Initialize() override {};
+    void On() override;
+    void Off() override;
+    void SetPixel(uint idx, uint32_t color) override;
+    void SetIgnore(std::vector<uint32_t> vIgnore) override;
+
+protected:
+    uint m_nPin;
+    uint32_t m_nColor;
+    std::vector<uint32_t> m_vIgnore;
 };
 #endif

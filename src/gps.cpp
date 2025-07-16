@@ -47,7 +47,7 @@ static std::map<std::string, eSentenceType> g_SentenceTypeMap = {
     {"$GPRMC", kGPRMC},
     {"$GPVTG", kGPVTG},
     {"$PGTOP", kPGTOP},
-    {"$PCDP",  kPCD  },
+    {"$PCD",   kPCD  },
 };
 
 static GPS* sg_pGPS          = NULL;
@@ -91,10 +91,6 @@ void GPS::SetGpsDataCallback(void* pCtx, gpsDataCallback pCB)
 
 void GPS::Run()
 {
-#if !defined(NDEBUG)
-    sleep_ms(10000);
-#endif
-
     // Set up GPS
     uart_set_fifo_enabled(m_pUART0, true);
     sg_pGPS     = this; // Allow interrupt handler to call us back
@@ -129,8 +125,8 @@ void GPS::Run()
                 // until some data is received to ensure the GPS has finished initializing.
                 std::string strPGCMD("$PGCMD,33,1*6C\r\n"); // Enable antenna output for PA6H
                 std::string strCDCMD("$CDCMD,33,1*7C\r\n"); // Enable antenna output for PA1616S
-                uart_write_blocking(m_pUART0, (const uint8_t*)strPGCMD.c_str(), strPGCMD.length());
-                uart_write_blocking(m_pUART0, (const uint8_t*)strCDCMD.c_str(), strCDCMD.length());
+                uart_puts(m_pUART0, strPGCMD.c_str());
+                uart_puts(m_pUART0, strCDCMD.c_str());
                 bSentAntennaCommands = true;
             }
         }
