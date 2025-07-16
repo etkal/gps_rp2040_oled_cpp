@@ -135,9 +135,11 @@ void LED_neo::SetPixel(uint idx, uint32_t color)
     m_vPixels[idx] = color;
 }
 
+
 #if defined(RASPBERRYPI_PICO_W)
 LED_pico_w::LED_pico_w(uint pin)
-    : LED_pico(pin)
+    : m_nPin(pin),
+      m_nColor(led_white)
 {
     Off();
 }
@@ -162,5 +164,15 @@ void LED_pico_w::On()
 void LED_pico_w::Off()
 {
     cyw43_arch_gpio_put(m_nPin, 0);
+}
+
+void LED_pico_w::SetPixel(uint idx, uint32_t color)
+{
+    m_nColor = color;
+}
+
+void LED_pico_w::SetIgnore(std::vector<uint32_t> vIgnore)
+{
+    m_vIgnore = vIgnore;
 }
 #endif

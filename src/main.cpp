@@ -68,6 +68,10 @@ int main()
     stdio_init_all();
     adc_init();
 
+#if !defined(NDEBUG)
+    sleep_ms(10000);
+#endif
+
     // Set up UART for GPS device
     uart_init(UART0_DEVICE, UART_BAUD_RATE);
     gpio_set_function(PIN_UART0_TX, GPIO_FUNC_UART);
@@ -114,13 +118,13 @@ int main()
     spLED->SetPixel(0, led_green);
 #elif defined(USE_LED_PIN)
     spLED = std::make_shared<LED_pico>(USE_LED_PIN);
-    spLED->SetIgnore({led_red});
+    spLED->SetIgnore({led_red, led_magenta});
 #elif defined(PICO_DEFAULT_LED_PIN)
     spLED = std::make_shared<LED_pico>(PICO_DEFAULT_LED_PIN);
-    spLED->SetIgnore({led_red});
+    spLED->SetIgnore({led_red, led_magenta});
 #elif defined(RASPBERRYPI_PICO_W)
     spLED = std::make_shared<LED_pico_w>(CYW43_WL_GPIO_LED_PIN);
-    spLED->SetIgnore({led_red});
+    spLED->SetIgnore({led_red, led_magenta});
 #endif
 
 // Create the GPS object
