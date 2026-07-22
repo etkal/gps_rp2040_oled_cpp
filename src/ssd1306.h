@@ -11,6 +11,7 @@
 
 #include <hardware/i2c.h>
 #include "framebuf.h"
+#include "font.h"
 
 // Register definitions
 #define OLED_RDDSDR              0x0f // Read Display Self-Diagnostic Result
@@ -80,6 +81,8 @@ public:
     void Line(int x1, int y1, int x2, int y2, uint16_t color);
     void Ellipse(int cx, int cy, int xradius, int yradius, uint16_t color, bool bFill = false, uint8_t mask = ELLIPSE_MASK_ALL);
     void Text(const char* str, int x, int y, uint16_t color);
+    void Text(const char* str, int x, int y, uint16_t color, int scale);
+    void Text(const char* str, int x, int y, uint16_t color, const BitmapFont& font, int scale = 1);
 
     uint16_t Width()
     {

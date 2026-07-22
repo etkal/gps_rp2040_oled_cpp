@@ -63,6 +63,14 @@
 #define GPSD_GMT_OFFSET 0.0
 #endif
 
+extern "C"
+{
+    int _getentropy(void* buffer, size_t length)
+    {
+        return ENOSYS;
+    }
+}
+
 int main()
 {
     stdio_init_all();
