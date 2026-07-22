@@ -146,7 +146,7 @@ void GPS_OLED::updateUI(GPSData::Shared spGPSData)
     drawSatGrid(nWidth / 4, nHeight / 2, nHeight / 2 - getCharHeight() / 2, 2);
 
     // Draw fix and #sats text
-    drawText(0, spGPSData->strMode3D + (m_spGPSData->bExternalAntenna ? " *" : ""), COLOUR_WHITE, false, X_PAD);
+    drawText(0, spGPSData->strMode3D + (m_spGPSData->bExternalAntenna ? "*" : ""), COLOUR_WHITE, false, X_PAD);
     drawText(3, spGPSData->strNumSats, COLOUR_WHITE, true, X_PAD);
 
     if (!spGPSData->strLatitude.empty())
