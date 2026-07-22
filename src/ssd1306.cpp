@@ -195,6 +195,16 @@ void SSD1306::Text(const char* str, int x, int y, uint16_t color)
     return Framebuf::text(str, x, y, color);
 }
 
+void SSD1306::Text(const char* str, int x, int y, uint16_t color, int scale)
+{
+    return text(str, x, y, color, scale);
+}
+
+void SSD1306::Text(const char* str, int x, int y, uint16_t color, const BitmapFont& font, int scale)
+{
+    return text(str, x, y, color, font, scale);
+}
+
 //
 // SSD1306_I2C
 //

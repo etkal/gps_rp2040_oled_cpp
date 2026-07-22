@@ -1,7 +1,7 @@
 /*
  * GPS using OLED display
  *
- * Copyright (c) 2025 Erik Tkal
+ * Copyright (c) 2025-2026 Erik Tkal
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,7 @@
 #include "ssd1306.h"
 #include "gps_oled.h"
 #include "power_status.h"
+#include "font_factory.h"
 
 #if !defined(NDEBUG)
 #include <malloc.h>
@@ -52,13 +53,6 @@ static uint32_t getFreeHeap()
 #endif
 
 #define SAT_ICON_RADIUS 2
-
-constexpr uint CHAR_WIDTH  = 8;
-constexpr uint CHAR_HEIGHT = 8;
-constexpr uint LINE_HEIGHT = (CHAR_HEIGHT + 1);
-constexpr uint COL_WIDTH   = (CHAR_WIDTH);
-constexpr uint PAD_CHARS   = 0;
-constexpr uint X_PAD       = 0;
 
 constexpr double pi = 3.14159265359;
 
@@ -78,6 +72,9 @@ void GPS_OLED::Initialize()
 {
     m_spDisplay->Reset();
     m_spDisplay->Initialize();
+
+    // Initialize display with desired font (best is Terminus 12, anything larger is not recommended)
+    m_spDisplay->SetFont(get_terminus_font(12));
 
     m_spDisplay->SetContrast(0x10);
     m_spDisplay->Fill(COLOUR_BLACK);
@@ -123,6 +120,12 @@ void GPS_OLED::updateUI(GPSData::Shared spGPSData)
     uint16_t nWidth  = m_spDisplay->Width();
     uint16_t nHeight = m_spDisplay->Height();
 
+    // Compute padding dynamically from font dimensions
+    constexpr uint PAD_CHARS_X = 0;
+    // constexpr uint PAD_CHARS_Y = 0;
+    uint X_PAD = PAD_CHARS_X * getCharWidth();
+    // uint Y_PAD = PAD_CHARS_Y * (getCharHeight() + 1);
+
 #if defined(VOLTAGE_DISPLAY)
     float vsys    = 0.0;
     bool bBattery = false;
@@ -140,27 +143,29 @@ void GPS_OLED::updateUI(GPSData::Shared spGPSData)
     m_spDisplay->Fill(COLOUR_BLACK);
 
     // Draw satellite grid
-    drawSatGrid(nWidth / 4, nHeight / 2, nHeight / 2 - CHAR_HEIGHT / 2, 2);
+    drawSatGrid(nWidth / 4, nHeight / 2, nHeight / 2 - getCharHeight() / 2, 2);
 
     // Draw fix and #sats text
-    drawText(0, spGPSData->strMode3D, COLOUR_WHITE, false, X_PAD);
-    drawText(-1, m_spGPSData->bExternalAntenna ? "*" : " ", COLOUR_WHITE, false, X_PAD);
+    drawText(0, spGPSData->strMode3D + (m_spGPSData->bExternalAntenna ? " *" : ""), COLOUR_WHITE, false, X_PAD);
     drawText(3, spGPSData->strNumSats, COLOUR_WHITE, true, X_PAD);
 
-    if (!spGPSData->strGPSTime.empty())
-    {
-        drawText(-1, spGPSData->strGPSTime, COLOUR_WHITE, true, X_PAD);
-    }
     if (!spGPSData->strLatitude.empty())
     {
         drawText(0, spGPSData->strLatitude, COLOUR_WHITE, true, X_PAD);
         drawText(1, spGPSData->strLongitude, COLOUR_WHITE, true, X_PAD);
         drawText(2, spGPSData->strAltitude, COLOUR_WHITE, true, X_PAD);
-        drawText(4, spGPSData->strSpeed, COLOUR_WHITE, true, X_PAD);
+        if (getCharHeight() <= 12) // only if room
+        {
+            drawText(4, spGPSData->strSpeed, COLOUR_WHITE, true, X_PAD);
+        }
+    }
+    if (!spGPSData->strGPSTime.empty())
+    {
+        drawText(-1, spGPSData->strGPSTime, COLOUR_WHITE, true, X_PAD);
     }
 
 #if defined(VOLTAGE_DISPLAY)
-    if (!strVsys.empty())
+    if (!strVsys.empty() && getCharHeight() <= 8) // only if room
     {
         drawText(-2, strVsys, COLOUR_WHITE, true, X_PAD);
     }
@@ -185,9 +190,10 @@ void GPS_OLED::drawSatGrid(uint xCenter, uint yCenter, uint radius, uint nRings)
 
     m_spDisplay->VLine(xCenter, yCenter - radius - 2, 2 * radius + 5, COLOUR_WHITE);
     m_spDisplay->HLine(xCenter - radius - 2, yCenter, 2 * radius + 5, COLOUR_WHITE);
-    // m_spDisplay->Text("N", xCenter - CHAR_WIDTH / 2, yCenter - radius - CHAR_HEIGHT, COLOUR_RED);
-    m_spDisplay->Text("'", xCenter - 6, yCenter - radius - CHAR_HEIGHT / 2, COLOUR_RED);
-    m_spDisplay->Text("`", xCenter - 2, yCenter - radius - CHAR_HEIGHT / 2, COLOUR_RED);
+    // m_spDisplay->Text("N", xCenter - getCharWidth() / 2, yCenter - radius - getCharHeight(), COLOUR_RED);
+    m_spDisplay->Text("^", xCenter - getCharWidth() / 2, yCenter - radius - getCharHeight(), COLOUR_RED);
+    // m_spDisplay->Text("'", xCenter - 6, yCenter - radius - getCharHeight() / 2, COLOUR_RED);
+    // m_spDisplay->Text("`", xCenter - 2, yCenter - radius - getCharHeight() / 2, COLOUR_RED);
 
     int satRadius = SAT_ICON_RADIUS / 2;
     if (!m_spGPSData->strLatitude.empty())
@@ -232,14 +238,14 @@ void GPS_OLED::drawCircleSat(uint gridCenterX,
 int GPS_OLED::linePos(int nLine)
 {
     if (nLine >= 0)
-        return nLine * LINE_HEIGHT;
+        return nLine * getLineAdvance();
     else
-        return m_spDisplay->Height() + 1 + (nLine * LINE_HEIGHT);
+        return m_spDisplay->Height() + (nLine * getLineAdvance());
 }
 
 void GPS_OLED::drawText(int nLine, std::string strText, uint16_t color, bool bRightAlign, uint nRightPad)
 {
-    int x = (!bRightAlign) ? 0 : m_spDisplay->Width() - (strText.length() * COL_WIDTH);
+    int x = (!bRightAlign) ? 0 : m_spDisplay->Width() - (strText.length() * getCharWidth());
     int y = linePos(nLine);
     x     = x - nRightPad;
     m_spDisplay->Text(strText.c_str(), x, y, color);

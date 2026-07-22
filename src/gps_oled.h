@@ -17,6 +17,7 @@
 #include "ssd1306.h"
 #include "gps.h"
 #include "led.h"
+#include "font.h"
 
 // GPS_OLED class
 //
@@ -55,6 +56,34 @@ private:
                        uint16_t fillColor = COLOUR_WHITE);
     int linePos(int nLine);
     void drawText(int nLine, std::string strText, uint16_t color = COLOUR_WHITE, bool bRightAlign = true, uint nPadding = 0);
+
+    // Font management - delegates to m_spDisplay
+    void SetFont(const BitmapFont* pFont)
+    {
+        if (m_spDisplay)
+            m_spDisplay->SetFont(pFont);
+    }
+    const BitmapFont* GetFont() const
+    {
+        return m_spDisplay ? m_spDisplay->GetFont() : nullptr;
+    }
+
+    // Get current font dimensions dynamically from display's font
+    inline uint getCharWidth() const
+    {
+        const BitmapFont* pFont = GetFont();
+        return pFont ? pFont->width : 8;
+    }
+    inline uint getCharHeight() const
+    {
+        const BitmapFont* pFont = GetFont();
+        return pFont ? pFont->height : 8;
+    }
+    inline uint getLineAdvance() const
+    {
+        const BitmapFont* pFont = GetFont();
+        return pFont ? pFont->effectiveLineAdvance() : 8;
+    }
 
     SSD1306::Shared m_spDisplay;
     GPS::Shared m_spGPS;

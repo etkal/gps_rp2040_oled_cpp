@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.24)
 
 # Set the board type for pin and LED decisions
 #set(PICO_BOARD pico)
-set(PICO_BOARD pico_w)
+#set(PICO_BOARD pico_w)
 #set(PICO_BOARD waveshare_rp2040_zero)
-#set(PICO_BOARD seeed_xiao_rp2040)
+set(PICO_BOARD seeed_xiao_rp2040)
 
 # GMT Offset for clock display (if used)
 # add_compile_definitions(GPSD_GMT_OFFSET=-5.0)
